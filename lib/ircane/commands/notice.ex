@@ -1,8 +1,6 @@
 defmodule IRCane.Commands.Notice do
   alias IRCane.Channel
-  alias IRCane.ChannelRegistry
   alias IRCane.Client
-  alias IRCane.NickRegistry
 
   def handle([targets, message | message_parts], state) do
     message = Enum.join([message | message_parts], " ")
@@ -20,14 +18,12 @@ defmodule IRCane.Commands.Notice do
   end
 
   defp dispatch("#" <> _ = target,  message, state) do
-    with [{pid, _}] <- Registry.lookup(ChannelRegistry, String.downcase(target)) do
-      Channel.notice(pid, state, message)
-    end
+    Channel.notice(target, state, message)
+    :ok
   end
 
   defp dispatch(target,  message, state) do
-    with [{pid, _}] <- Registry.lookup(NickRegistry, String.downcase(target)) do
-      Client.notice(pid, state, message)
-    end
+    Client.notice(target, state, message)
+    :ok
   end
 end

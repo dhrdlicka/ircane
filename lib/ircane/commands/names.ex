@@ -1,6 +1,5 @@
 defmodule IRCane.Commands.Names do
   alias IRCane.Channel
-  alias IRCane.ChannelRegistry
 
   def handle([channels | _], state) do
     names =
@@ -17,11 +16,11 @@ defmodule IRCane.Commands.Names do
   end
 
   defp fetch_names(channel_name) do
-    case Registry.lookup(ChannelRegistry, String.downcase(channel_name)) do
-      [{pid, _}] ->
-        with {:ok, {channel_name, names}} <- Channel.names(pid),
-          do: {:names, channel_name, names}
-      [] ->
+    case Channel.names(channel_name) do
+      {:ok, {channel_name, names}} ->
+        {:names, channel_name, names}
+
+      _ ->
         {:names, channel_name, []}
     end
   end

@@ -26,8 +26,22 @@ defmodule IRCane.Channel do
     GenServer.cast(pid, {:broadcast_quit, ref, from, quit_message})
   end
 
+  def join(channel_name, client) when is_binary(channel_name) do
+    join(via_tuple(channel_name), client)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
+  end
+
   def join(pid, client) do
     GenServer.call(pid, {:join, client})
+  end
+
+  def part(channel_name, client, reason) when is_binary(channel_name) do
+    part(via_tuple(channel_name), client, reason)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def part(pid, client, reason) do
@@ -36,6 +50,9 @@ defmodule IRCane.Channel do
 
   def names(channel_name) when is_binary(channel_name) do
     names(via_tuple(channel_name))
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def names(pid) do
@@ -44,6 +61,9 @@ defmodule IRCane.Channel do
 
   def privmsg(channel_name, client, message) when is_binary(channel_name) do
     privmsg(via_tuple(channel_name), client, message)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def privmsg(pid, client, message) do
@@ -52,6 +72,9 @@ defmodule IRCane.Channel do
 
   def notice(channel_name, client, message) when is_binary(channel_name) do
     notice(via_tuple(channel_name), client, message)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def notice(pid, client, message) do
@@ -60,6 +83,9 @@ defmodule IRCane.Channel do
 
   def topic(channel_name) when is_binary(channel_name) do
     topic(via_tuple(channel_name))
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def topic(pid) do
@@ -68,6 +94,9 @@ defmodule IRCane.Channel do
 
   def topic(channel_name, client, new_topic) when is_binary(channel_name) do
     topic(via_tuple(channel_name), client, new_topic)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
   end
 
   def topic(pid, client, new_topic) do
@@ -93,7 +122,7 @@ defmodule IRCane.Channel do
   def handle_call({:join, client}, {client_pid, _}, %{permanent?: false} = state) when map_size(state.members) == 0 do
     # First user to join an empty non-permanent channel becomes operator
     Logger.notice("User #{client.nickname} created channel #{state.name}")
-    {:reply, :ok, %{state | members: %{client_pid => %{nickname: client.nickname, operator?: true}}}}
+    {:reply, {:ok, self()}, %{state | members: %{client_pid => %{nickname: client.nickname, operator?: true}}}}
   end
 
   @impl true
@@ -107,7 +136,7 @@ defmodule IRCane.Channel do
 
         membership = %{nickname: client.nickname}
         members = Map.put(state.members, client_pid, membership)
-        {:reply, :ok, %{state | members: members}, {:continue, {:notify_join, client}}}
+        {:reply, {:ok, self()}, %{state | members: members}, {:continue, {:notify_join, client}}}
     end
   end
 
@@ -128,7 +157,7 @@ defmodule IRCane.Channel do
       %{^client_pid => _} ->
         Logger.info("User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}")
         new_members = Map.delete(state.members, client_pid)
-        {:reply, :ok, %{state | members: new_members}, {:continue, {:notify_part, client, reason}}}
+        {:reply, {:ok, self()}, %{state | members: new_members}, {:continue, {:notify_part, client, reason}}}
 
       _ ->
         {:reply, {:error, {:not_on_channel, state.name}}, state}

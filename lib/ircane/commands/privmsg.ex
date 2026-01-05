@@ -1,8 +1,6 @@
 defmodule IRCane.Commands.Privmsg do
   alias IRCane.Channel
-  alias IRCane.ChannelRegistry
   alias IRCane.Client
-  alias IRCane.NickRegistry
 
   require Logger
 
@@ -29,20 +27,10 @@ defmodule IRCane.Commands.Privmsg do
   end
 
   defp dispatch("#" <> _ = target, message, state) do
-    with [{pid, _}] <- Registry.lookup(ChannelRegistry, String.downcase(target)) do
-      Channel.privmsg(pid, state, message)
-    else
-      [] ->
-        {:error, {:no_such_nick, target}}
-    end
+    Channel.privmsg(target, state, message)
   end
 
   defp dispatch(target, message, state) do
-    with [{pid, _}] <- Registry.lookup(NickRegistry, String.downcase(target)) do
-      Client.privmsg(pid, state, message)
-    else
-      [] ->
-        {:error, {:no_such_nick, target}}
-    end
+    Client.privmsg(target, state, message)
   end
 end

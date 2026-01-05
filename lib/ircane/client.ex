@@ -58,6 +58,9 @@ defmodule IRCane.Client do
 
   def privmsg(nickname, client, message) when is_binary(nickname) do
     privmsg(via_tuple(nickname), client, message)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_nick, nickname}}
   end
 
   def privmsg(pid, client, message) do
@@ -66,6 +69,9 @@ defmodule IRCane.Client do
 
   def notice(nickname, client, message) when is_binary(nickname) do
     notice(via_tuple(nickname), client, message)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_nick, nickname}}
   end
 
   def notice(pid, client, message) do
