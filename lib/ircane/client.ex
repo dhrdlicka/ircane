@@ -1,6 +1,6 @@
 defmodule IRCane.Client do
   alias IRCane.Channel
-  alias IRCane.Message
+  alias IRCane.Protocol.Message
   alias IRCane.NickRegistry
   alias IRCane.Replies
 

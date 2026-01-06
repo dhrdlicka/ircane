@@ -1,5 +1,5 @@
 defmodule IRCane.Replies do
-  alias IRCane.Message
+  alias IRCane.Protocol.Message
 
   @network_name "TestNet"
   @server_name "localhost"
