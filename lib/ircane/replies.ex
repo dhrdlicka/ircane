@@ -1,10 +1,14 @@
 defmodule IRCane.Replies do
   alias IRCane.Protocol.Message
+  alias IRCane.Protocol.Mode
 
   @network_name "TestNet"
   @server_name "localhost"
   @version "ircane-0.1"
   @created_date DateTime.utc_now()
+
+  @prefixes Application.compile_env!(:ircane, :prefixes)
+  @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   defp format_numeric(reply, client) do
     case reply do
@@ -44,11 +48,25 @@ defmodule IRCane.Replies do
       {:global_users, users, max} ->
         %Message{source: @server_name, command: "266", params: [client, users, max, "Current global users: #{users}, max: #{max}"]}
 
+      {:channel_mode_is, target, modes} ->
+        mode_strings =
+          modes
+          |> Enum.map(&({:add, &1}))
+          |> Mode.build(@channel_modes)
+
+        %Message{source: @server_name, command: "324", params: [client, target | mode_strings]}
+
       {:names_reply, channel, names} ->
         %Message{source: @server_name, command: "353", params: [client, "=", channel, names]}
 
       {:end_of_names, channel} ->
         %Message{source: @server_name, command: "366", params: [client, channel, "End of /NAMES list"]}
+
+      {:ban_list, target, mask} ->
+        %Message{source: @server_name, command: "367", params: [client, target, mask]}
+
+      {:end_of_ban_list, target} ->
+        %Message{source: @server_name, command: "368", params: [client, target, "End of channel ban list"]}
 
       {:no_such_nick, nickname} ->
         %Message{source: @server_name, command: "401", params: [client, nickname, "No such nick/channel"]}
@@ -89,11 +107,17 @@ defmodule IRCane.Replies do
       :not_registered ->
         %Message{source: @server_name, command: "451", params: [client, "You have not registered"]}
 
+      {:unknown_mode, mode} ->
+        %Message{source: @server_name, command: "472", params: [client, <<mode>>, "is unknown mode char to me"]}
+
       {:chan_o_privs_needed, channel} ->
         %Message{source: @server_name, command: "482", params: [client, channel, "You're not channel operator"]}
 
       :users_dont_match ->
         %Message{source: @server_name, command: "502", params: [client, "Cant change mode for other users"]}
+
+      {:need_more_params, command} ->
+        %Message{source: @server_name, command: "461", params: [client, command, "Not enough parameters"]}
 
       other ->
         %Message{source: @server_name, command: "400", params: [client, "Unknown message: #{inspect(other)}"]}
@@ -163,8 +187,8 @@ defmodule IRCane.Replies do
     member_list =
       members
       |> Enum.map(fn
-        %{nickname: nickname, operator?: true} -> "@#{nickname}"
-        %{nickname: nickname, voice?: true} -> "+#{nickname}"
+        %{nickname: nickname, operator?: true} -> <<@prefixes[:operator]>> <> nickname
+        %{nickname: nickname, voice?: true} -> <<@prefixes[:voice]>> <> nickname
         %{nickname: nickname} -> nickname
       end)
       |> Enum.join(" ")
@@ -186,6 +210,18 @@ defmodule IRCane.Replies do
       {:local_users, lusers.users, lusers.max_users},
       {:global_users, lusers.users, lusers.max_users}
     ]
+    |> Enum.map(&format_numeric(&1, client))
+  end
+
+  def format_message({:channel_mode, source, target, modes}, _client) do
+    mode_strings = Mode.build(modes, @channel_modes)
+    [%Message{source: source.nickname, command: "MODE", params: [target | mode_strings]}]
+  end
+
+  def format_message({:ban_list, target, bans}, client) do
+    bans
+    |> Enum.map(&({:ban_list, target, &1}))
+    |> Kernel.++([{:end_of_ban_list, target}])
     |> Enum.map(&format_numeric(&1, client))
   end
 

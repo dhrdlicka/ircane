@@ -9,7 +9,14 @@ defmodule IRCane.Channel do
   defstruct name: nil,
             members: %{},
             topic: nil,
-            permanent?: false
+            bans: [],
+            channel_limit: nil,
+            key: nil,
+            invite_only?: false,
+            moderated?: false,
+            secret?: false,
+            protected_topic?: true,
+            no_external_messages?: true
 
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts) do
@@ -103,6 +110,28 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:topic, client, new_topic})
   end
 
+  def mode(channel_name) when is_binary(channel_name) do
+    mode(via_tuple(channel_name))
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
+  end
+
+  def mode(pid) do
+    GenServer.call(pid, :mode)
+  end
+
+  def update_mode(channel_name, operations, client) when is_binary(channel_name) do
+    update_mode(via_tuple(channel_name), operations, client)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_channel, channel_name}}
+  end
+
+  def update_mode(pid, operations, client) do
+    GenServer.call(pid, {:update_mode, operations, client})
+  end
+
   defp via_tuple(channel_name) do
     {:via, Registry, {ChannelRegistry, String.downcase(channel_name)}}
   end
@@ -110,16 +139,15 @@ defmodule IRCane.Channel do
   @impl true
   def init(opts) do
     channel_name = Keyword.fetch!(opts, :name)
-    permanent? = Keyword.get(opts, :permanent, false)
 
     Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ -> channel_name end)
 
-    state = %__MODULE__{name: channel_name, permanent?: permanent?}
+    state = %__MODULE__{name: channel_name}
     {:ok, state}
   end
 
   @impl true
-  def handle_call({:join, client}, {client_pid, _}, %{permanent?: false} = state) when map_size(state.members) == 0 do
+  def handle_call({:join, client}, {client_pid, _}, state) when map_size(state.members) == 0 do
     # First user to join an empty non-permanent channel becomes operator
     Logger.notice("User #{client.nickname} created channel #{state.name}")
     {:reply, {:ok, self()}, %{state | members: %{client_pid => %{nickname: client.nickname, operator?: true}}}}
@@ -167,6 +195,36 @@ defmodule IRCane.Channel do
   @impl true
   def handle_call(:topic, _from, state) do
     {:reply, {:ok, {state.name, state.topic}}, state}
+  end
+
+  @impl true
+  def handle_call(:mode, _from, state) do
+    modes = []
+
+    modes = if state.invite_only?, do: [:invite_only | modes], else: modes
+    modes = if state.moderated?, do: [:moderated | modes], else: modes
+    modes = if state.secret?, do: [:secret | modes], else: modes
+    modes = if state.protected_topic?, do: [:protected_topic | modes], else: modes
+    modes = if state.no_external_messages?, do: [:no_external_messages | modes], else: modes
+    modes = if state.channel_limit, do: [{:channel_limit, state.channel_limit} | modes], else: modes
+    modes = if state.key, do: [{:key, state.key} | modes], else: modes
+
+    {:reply, {:ok, {state.name, modes}}, state}
+  end
+
+  @impl true
+  def handle_call({:update_mode, operations, client}, {client_pid, _}, state) do
+    # Check if user is channel operator
+    case state.members do
+      %{^client_pid => %{operator?: true}} ->
+        {new_state, applied_changes, errors} =
+          Enum.reduce(operations, {state, [], []}, &apply_mode/2)
+
+        {:reply, {:ok, {state.name, applied_changes, errors}}, new_state, {:continue, {:notify_mode, client, applied_changes}}}
+
+      _ ->
+        {:reply, {:error, {:chan_o_privs_needed, state.name}}, state}
+    end
   end
 
   @impl true
@@ -229,6 +287,12 @@ defmodule IRCane.Channel do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_continue({:notify_mode, client, applied_changes}, state) do
+    do_broadcast(make_ref(), client, {:channel_mode, client, state.name, applied_changes}, state)
+    {:noreply, state}
+  end
+
   defp do_broadcast(ref, from, message, state) do
     state.members
     |> Map.keys()
@@ -237,11 +301,43 @@ defmodule IRCane.Channel do
   end
 
   defp terminate_if_empty(state) do
-    if map_size(state.members) == 0 and not state.permanent? do
+    if map_size(state.members) == 0 do
       Logger.notice("Channel #{state.name} shut down after last user left")
       {:stop, :normal, state}
     else
       {:noreply, state}
+    end
+  end
+
+  defp apply_mode({_op, :invite_only} = mode, acc), do: apply_boolean_mode(acc, :invite_only?, mode)
+  defp apply_mode({_op, :moderated} = mode, acc), do: apply_boolean_mode(acc, :moderated?, mode)
+  defp apply_mode({_op, :secret} = mode, acc), do: apply_boolean_mode(acc, :secret?, mode)
+  defp apply_mode({_op, :protected_topic} = mode, acc), do: apply_boolean_mode(acc, :protected_topic?, mode)
+  defp apply_mode({_op, :no_external_messages} = mode, acc), do: apply_boolean_mode(acc, :no_external_messages?, mode)
+
+  defp apply_mode({:add, {:channel_limit, new_limit}}, {state, changes, errors}) when state.channel_limit != new_limit do
+    {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit}} | changes], errors}
+  end
+
+  defp apply_mode({:remove, :channel_limit}, {state, changes, errors}) when not is_nil(state.channel_limit) do
+    {%{state | channel_limit: nil}, [{:remove, :channel_limit} | changes], errors}
+  end
+
+  defp apply_mode({:add, {:key, new_key}}, {%{key: nil} = state, changes, errors}) do
+    {%{state | key: new_key}, [{:add, {:key, new_key}} | changes], errors}
+  end
+
+  defp apply_mode({:remove, {:key, key}}, {state, changes, errors}) when state.key == key do
+    {%{state | key: nil}, [{:remove, :key} | changes], errors}
+  end
+
+  defp apply_mode(_, acc), do: acc
+
+  defp apply_boolean_mode({state, changes, errors}, field_name, {op, _mode_name} = change) do
+    case {op, Map.get(state, field_name)} do
+      {:add, false} -> {Map.put(state, field_name, true), [change | changes], errors}
+      {:remove, true} -> {Map.put(state, field_name, false), [change | changes], errors}
+      _ -> {state, changes, errors}
     end
   end
 end

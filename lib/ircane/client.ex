@@ -38,6 +38,7 @@ defmodule IRCane.Client do
     "PART" => IRCane.Commands.Part,
     "NAMES" => IRCane.Commands.Names,
     "TOPIC" => IRCane.Commands.Topic,
+    "MODE" => IRCane.Commands.Mode,
     "QUIT" => IRCane.Commands.Quit
   }
   @unregistered_commands ["NICK", "USER"]
