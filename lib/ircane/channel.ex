@@ -33,15 +33,15 @@ defmodule IRCane.Channel do
     GenServer.cast(pid, {:broadcast_quit, ref, from, quit_message})
   end
 
-  def join(channel_name, client) when is_binary(channel_name) do
-    join(via_tuple(channel_name), client)
+  def join(channel_name, client, key) when is_binary(channel_name) do
+    join(via_tuple(channel_name), client, key)
   catch
     :exit, {:noproc, _} ->
       {:error, {:no_such_channel, channel_name}}
   end
 
-  def join(pid, client) do
-    GenServer.call(pid, {:join, client})
+  def join(pid, client, key) do
+    GenServer.call(pid, {:join, client, key})
   end
 
   def part(channel_name, client, reason) when is_binary(channel_name) do
@@ -147,14 +147,14 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:join, client}, {client_pid, _}, state) when map_size(state.members) == 0 do
+  def handle_call({:join, client, _key}, {client_pid, _}, state) when map_size(state.members) == 0 do
     # First user to join an empty non-permanent channel becomes operator
     Logger.notice("User #{client.nickname} created channel #{state.name}")
     {:reply, {:ok, self()}, %{state | members: %{client_pid => %{nickname: client.nickname, operator?: true}}}}
   end
 
   @impl true
-  def handle_call({:join, client}, {client_pid, _}, state) do
+  def handle_call({:join, client, _key}, {client_pid, _}, state) do
     case state.members do
       %{^client_pid => _} ->
         {:reply, :noop, state}

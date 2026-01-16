@@ -6,12 +6,12 @@ defmodule IRCane.Commands.Join do
 
   @max_join_attempts 3
 
-  def handle([channels | _], state) do
+  def handle([channels | keys], state) do
     channels
     |> String.split(",")
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.reduce({[], state}, fn channel_name, {replies, current_state} ->
-      case join_channel(channel_name, current_state) do
+    |> zip_fill(keys)
+    |> Enum.reduce({[], state}, fn {channel_name, key}, {replies, current_state} ->
+      case join_channel(channel_name, key, current_state) do
         {:ok, new_state} ->
           {replies, new_state}
 
@@ -29,9 +29,9 @@ defmodule IRCane.Commands.Join do
     {:error, {:need_more_params, "JOIN"}}
   end
 
-  defp join_channel(channel_name, state) do
+  defp join_channel(channel_name, key, state) do
     with :ok <- validate_channel_name(channel_name),
-         {:ok, channel_pid} <- do_join(channel_name, state),
+         {:ok, channel_pid} <- do_join(channel_name, key, state),
          {:ok, {channel_name, topic}} <- Channel.topic(channel_pid),
          {:ok, {_channel_name, names}} <- Channel.names(channel_pid) do
       new_state = %{state | joined_channels: MapSet.put(state.joined_channels, channel_pid)}
@@ -75,30 +75,34 @@ defmodule IRCane.Commands.Join do
     {:error, {:invalid_channel_name, channel_name}}
   end
 
-  defp do_join(channel_name, state, attempts \\ @max_join_attempts)
+  defp do_join(channel_name, key, state, attempts \\ @max_join_attempts)
 
-  defp do_join(channel_name, _state, 0) do
+  defp do_join(channel_name, _key, _state, 0) do
     {:error, {:no_such_channel, channel_name}}
   end
 
-  defp do_join(channel_name, state, attempts) do
-    with {:ok, pid} <- Channel.join(channel_name, state) do
+  defp do_join(channel_name, key, state, attempts) do
+    with {:ok, pid} <- Channel.join(channel_name, state, key) do
       {:ok, pid}
     else
       {:error, {:no_such_channel, _channel_name}} ->
         with {:ok, pid} <- DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
-          Channel.join(pid, state)
+          Channel.join(pid, state, key)
         else
           {:error, {:already_started, _pid}} ->
-            do_join(channel_name, state, attempts - 1)
+            do_join(channel_name, key, state, attempts - 1)
 
           error ->
             Logger.warning("Failed to create channel #{channel_name}: #{inspect(error)}")
-            do_join(channel_name, state, attempts - 1)
+            do_join(channel_name, key, state, attempts - 1)
         end
 
       error ->
         error
     end
   end
+
+  defp zip_fill([x | xs], [y | ys]), do: [{x, y} | zip_fill(xs, ys)]
+  defp zip_fill([x | xs], []), do: [{x, nil} | zip_fill(xs, [])]
+  defp zip_fill([], _), do: []
 end
