@@ -28,4 +28,12 @@ config :ircane,
     ?w => {:type_d, :wallops}
   }
 
+config :ircane,
+  mode_opts: %{
+    channel_limit: [
+      parse: &Utils.parse_integer/1,
+      format: &Integer.to_string/1
+    ],
+  }
+
 config :ircane, prefixes: [voice: ?+, operator: ?@]

@@ -7,7 +7,9 @@ defmodule IRCane.Protocol.Mode do
           char => {mode_type, atom}
         }
 
-  @spec parse(list(String.t()), mode_map) :: list({:add | :remove | :list, t} | {:unknown, char})
+  @type invalid_reason :: {:unknown_mode, char} | {:invalid_param, atom, String.t()}
+
+  @spec parse(list(String.t()), mode_map) :: list({:add | :remove | :list, t} | {:invalid, invalid_reason})
   def parse([mode_string | args], known_modes),
     do: parse(String.to_charlist(mode_string), args, known_modes, :add, [])
 
@@ -46,11 +48,27 @@ defmodule IRCane.Protocol.Mode do
         parse(modes_tail, args, known_modes, op, [{op, name} | acc])
 
       _ ->
-        parse(modes_tail, args, known_modes, op, [{:unknown, mode} | acc])
+        parse(modes_tail, args, known_modes, op, [{:invalid, {:unknown_mode, mode}} | acc])
     end
   end
 
   defp parse([], _args, _known_modes, _op, acc), do: Enum.reverse(acc)
+
+  @spec parse_params(list({atom(), t}), keyword()) :: list({atom(), t})
+  def parse_params(modes, opts) do
+    Enum.map(modes, fn
+      {op, {name, arg}} when is_map_key(opts, name) ->
+        with parse_fn = Keyword.get(opts[name], :parse, &(&1)),
+             {:ok, parsed} <- parse_fn.(arg) do
+          {op, {name, parsed}}
+        else
+          _ ->
+            {:invalid, {:invalid_param, name, arg}}
+        end
+      other ->
+        other
+    end)
+  end
 
   @spec build(list({:add | :remove, t}), mode_map) :: list(String.t())
   def build(modes, known_modes),
@@ -98,5 +116,16 @@ defmodule IRCane.Protocol.Mode do
       |> List.to_string()
 
     [modes | Enum.reverse(args)]
+  end
+
+  @spec format_params(list({atom(), t}), keyword()) :: list({atom(), t})
+  def format_params(modes, opts) do
+    Enum.map(modes, fn
+      {op, {name, arg}} when is_map_key(opts, name) ->
+        format_fn = Keyword.get(opts[name], :format, &inspect/1)
+        {op, {name, format_fn.(arg)}}
+      other ->
+        other
+    end)
   end
 end

@@ -3,6 +3,7 @@ defmodule IRCane.Commands.Mode do
   alias IRCane.Channel
 
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
+  @mode_opts Application.compile_env!(:ircane, :mode_opts)
 
   def handle(["#" <> _ = target | []], state) do
     with {:ok, {channel_name, modes}} <- Channel.mode(target) do
@@ -11,20 +12,24 @@ defmodule IRCane.Commands.Mode do
   end
 
   def handle(["#" <> _ = target | params], state) do
-    modes = Mode.parse(params, @channel_modes)
+    modes =
+      params
+      |> Mode.parse(@channel_modes)
+      |> Mode.parse_params(@mode_opts)
+      |> IO.inspect()
 
-    {mode_changes, lists, unknown_modes} =
+    {mode_changes, lists, invalid} =
       Enum.reduce(modes, {[], [], []}, fn
         {:add, _} = op, {x, y, z} -> {[op | x], y, z}
         {:remove, _} = op, {x, y, z} -> {[op | x], y, z}
         {:list, mode}, {x, y, z} -> {x, [mode | y], z}
-        {:unknown, mode_char}, {x, y, z} -> {x, y, [mode_char | z]}
+        {:invalid, reason}, {x, y, z} -> {x, y, [reason | z]}
       end)
 
     unknown_modes =
-      unknown_modes
+      invalid
+      |> Enum.filter(fn {:unknown_mode, _} -> true; _ -> false end)
       |> Enum.uniq()
-      |> Enum.map(&({:unknown_mode, &1}))
 
     lists =
       lists

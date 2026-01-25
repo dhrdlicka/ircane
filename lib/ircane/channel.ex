@@ -331,13 +331,8 @@ defmodule IRCane.Channel do
   defp apply_mode({_op, :protected_topic} = mode, acc), do: apply_boolean_mode(acc, :protected_topic?, mode)
   defp apply_mode({_op, :no_external_messages} = mode, acc), do: apply_boolean_mode(acc, :no_external_messages?, mode)
 
-  defp apply_mode({:add, {:channel_limit, new_limit_str}}, {state, changes, errors} = acc) do
-    case Integer.parse(new_limit_str) do
-      {new_limit, _} when new_limit != state.channel_limit ->
-        {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit_str}} | changes], errors}
-      _ ->
-        acc
-    end
+  defp apply_mode({:add, {:channel_limit, new_limit}}, {state, changes, errors}) when new_limit != state.channel_limit do
+    {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit}} | changes], errors}
   end
 
   defp apply_mode({:remove, :channel_limit}, {state, changes, errors}) when not is_nil(state.channel_limit) do
