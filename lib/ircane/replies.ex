@@ -9,6 +9,7 @@ defmodule IRCane.Replies do
 
   @prefixes Application.compile_env!(:ircane, :prefixes)
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
+  @mode_opts Application.compile_env!(:ircane, :mode_opts)
 
   defp format_numeric(reply, client) do
     case reply do
@@ -220,7 +221,11 @@ defmodule IRCane.Replies do
   end
 
   def format_message({:channel_mode, source, target, modes}, _client) do
-    mode_strings = Mode.build(modes, @channel_modes)
+    mode_strings =
+      modes
+      |> Mode.format_params(@mode_opts)
+      |> Mode.build(@channel_modes)
+
     [%Message{source: source.nickname, command: "MODE", params: [target | mode_strings]}]
   end
 

@@ -16,7 +16,6 @@ defmodule IRCane.Commands.Mode do
       params
       |> Mode.parse(@channel_modes)
       |> Mode.parse_params(@mode_opts)
-      |> IO.inspect()
 
     {mode_changes, lists, invalid} =
       Enum.reduce(modes, {[], [], []}, fn
