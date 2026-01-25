@@ -34,6 +34,10 @@ config :ircane,
       parse: &Utils.parse_integer/1,
       format: &Integer.to_string/1
     ],
+    ban: [
+      parse: &BanMask.parse/1,
+      format: &BanMask.format/1
+    ],
   }
 
 config :ircane, prefixes: [voice: ?+, operator: ?@]

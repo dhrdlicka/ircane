@@ -1,4 +1,5 @@
 defmodule IRCane.Channel do
+  alias IRCane.BanMask
   alias IRCane.ChannelRegistry
   alias IRCane.Client
 
@@ -9,7 +10,7 @@ defmodule IRCane.Channel do
   defstruct name: nil,
             members: %{},
             topic: nil,
-            bans: [],
+            bans: MapSet.new(),
             channel_limit: nil,
             key: nil,
             invite_only?: false,
@@ -274,8 +275,13 @@ defmodule IRCane.Channel do
     {:noreply, %{state | members: members}}
   end
 
-  def handle_cast({:notice, from, message}, state) do
-    do_broadcast(make_ref(), from, {:notice, from, state.name, message}, state)
+  def handle_cast({:notice, client, message}, state) do
+    with :ok <- enforce_no_external_messages(state, client.pid),
+         :ok <- enforce_moderated(state, client.pid),
+         :ok <- enforce_ban(state, client) do
+      do_broadcast(make_ref(), client, {:notice, client, state.name, message}, state)
+    end
+
     {:noreply, state}
   end
 
@@ -305,7 +311,10 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_continue({:notify_privmsg, client, message}, state) do
-    do_broadcast(make_ref(), client, {:privmsg, client, state.name, message}, state)
+    if not is_banned?(state, client) do
+      do_broadcast(make_ref(), client, {:privmsg, client, state.name, message}, state)
+    end
+
     {:noreply, state}
   end
 
@@ -347,6 +356,24 @@ defmodule IRCane.Channel do
     {%{state | key: nil}, [{:remove, :key} | changes], errors}
   end
 
+  defp apply_mode({:add, {:ban, ban_mask}}, {state, changes, errors}) do
+    if MapSet.member?(state.bans, ban_mask) do
+      {state, changes, errors}
+    else
+      new_bans = MapSet.put(state.bans, ban_mask)
+      {%{state | bans: new_bans}, [{:add, {:ban, ban_mask}} | changes], errors}
+    end
+  end
+
+  defp apply_mode({:remove, {:ban, ban_mask}}, {state, changes, errors}) do
+    if MapSet.member?(state.bans, ban_mask) do
+      new_bans = MapSet.delete(state.bans, ban_mask)
+      {%{state | bans: new_bans}, [{:remove, {:ban, ban_mask}} | changes], errors}
+    else
+      {state, changes, errors}
+    end
+  end
+
   defp apply_mode(_, acc), do: acc
 
   defp apply_boolean_mode({state, changes, errors}, field_name, {op, _mode_name} = change) do
@@ -375,6 +402,10 @@ defmodule IRCane.Channel do
     Map.has_key?(state.members, client_pid)
   end
 
+  defp is_banned?(%{bans: bans}, client) do
+    Enum.any?(bans, &BanMask.match?(&1, client))
+  end
+
   defp ensure_member(state, client_pid) do
     if is_member?(state, client_pid),
       do: :ok,
@@ -387,7 +418,11 @@ defmodule IRCane.Channel do
       else: {:error, {:chan_o_privs_needed, state.name}}
   end
 
-  defp enforce_ban(_state, _client), do: :ok
+  defp enforce_ban(state, client) do
+    if is_banned?(state, client),
+      do: {:error, {:banned_from_chan, state.name}},
+      else: :ok
+  end
 
   defp enforce_channel_limit(%{channel_limit: nil}), do: :ok
   defp enforce_channel_limit(state) do

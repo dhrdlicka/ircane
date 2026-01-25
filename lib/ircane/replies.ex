@@ -114,6 +114,9 @@ defmodule IRCane.Replies do
       {:unknown_mode, mode} ->
         %Message{source: @server_name, command: "472", params: [client, <<mode::utf8>>, "is unknown mode char to me"]}
 
+      {:banned_from_chan, channel} ->
+        %Message{source: @server_name, command: "474", params: [client, channel, "Cannot join channel (+b)"]}
+
       {:bad_channel_key, channel} ->
         %Message{source: @server_name, command: "475", params: [client, channel, "Cannot join channel (+k)"]}
 
