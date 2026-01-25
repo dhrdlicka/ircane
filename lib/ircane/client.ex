@@ -1,7 +1,7 @@
 defmodule IRCane.Client do
   alias IRCane.Channel
   alias IRCane.Protocol.Message
-  alias IRCane.NickRegistry
+  alias IRCane.UserRegistry
   alias IRCane.Replies
 
   require Logger
@@ -189,7 +189,7 @@ defmodule IRCane.Client do
   end
 
   defp via_tuple(nickname) do
-    {:via, Registry, {NickRegistry, String.downcase(nickname)}}
+    {:via, Registry, {UserRegistry, String.downcase(nickname)}}
   end
 
   defp handle_packet(packet, state) do

@@ -14,7 +14,7 @@ defmodule IRCane do
       {DynamicSupervisor, name: IRCane.ClientSupervisor},
       {DynamicSupervisor, name: IRCane.ChannelSupervisor},
       {Registry, keys: :unique, name: IRCane.ChannelRegistry},
-      {Registry, keys: :unique, name: IRCane.NickRegistry},
+      {Registry, keys: :unique, name: IRCane.UserRegistry},
       IRCane.ListenerSupervisor
     ]
 

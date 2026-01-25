@@ -1,13 +1,13 @@
 defmodule IRCane.Commands.Lusers do
   alias IRCane.ChannelRegistry
   alias IRCane.ClientSupervisor
-  alias IRCane.NickRegistry
+  alias IRCane.UserRegistry
 
   def handle(_params, state) do
     %{active: connections} =
       DynamicSupervisor.count_children(ClientSupervisor)
 
-    users = Registry.count(NickRegistry)
+    users = Registry.count(UserRegistry)
     channels = Registry.count(ChannelRegistry)
 
     reply = %{

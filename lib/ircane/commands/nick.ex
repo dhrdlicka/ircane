@@ -15,8 +15,8 @@ defmodule IRCane.Commands.Nick do
     new_key = String.downcase(new_nickname)
     old_key = String.downcase(state.nickname || "")
 
-    with {:ok, _} <- Registry.register(IRCane.NickRegistry, new_key, new_nickname) do
-      Registry.unregister(IRCane.NickRegistry, old_key)
+    with {:ok, _} <- Registry.register(IRCane.UserRegistry, new_key, new_nickname) do
+      Registry.unregister(IRCane.UserRegistry, old_key)
 
       new_state = %{state | nickname: new_nickname}
 
