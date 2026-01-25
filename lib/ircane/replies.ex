@@ -83,7 +83,7 @@ defmodule IRCane.Replies do
       {:topic_who_time, channel, nick, set_at} ->
         %Message{source: @server_name, command: "333", params: [client, channel, nick, "#{DateTime.to_unix(set_at)}"]}
 
-      {:cannot_send_to_channel, channel} ->
+      {:cannot_send_to_chan, channel} ->
         %Message{source: @server_name, command: "404", params: [client, channel, "Cannot send to channel"]}
 
       {:unknown_command, command} ->
@@ -107,8 +107,14 @@ defmodule IRCane.Replies do
       :not_registered ->
         %Message{source: @server_name, command: "451", params: [client, "You have not registered"]}
 
+      {:channel_is_full, channel} ->
+        %Message{source: @server_name, command: "471", params: [client, channel, "Cannot join channel (+l)"]}
+
       {:unknown_mode, mode} ->
         %Message{source: @server_name, command: "472", params: [client, <<mode>>, "is unknown mode char to me"]}
+
+      {:bad_channel_key, channel} ->
+        %Message{source: @server_name, command: "475", params: [client, channel, "Cannot join channel (+k)"]}
 
       {:chan_o_privs_needed, channel} ->
         %Message{source: @server_name, command: "482", params: [client, channel, "You're not channel operator"]}

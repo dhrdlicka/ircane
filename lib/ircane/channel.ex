@@ -154,17 +154,23 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:join, client, _key}, {client_pid, _}, state) do
-    case state.members do
-      %{^client_pid => _} ->
-        {:reply, :noop, state}
-
-      _ ->
+  def handle_call({:join, client, key}, {client_pid, _}, state) do
+    if not is_map_key(state.members, client_pid) do
+      with :ok <- enforce_ban(state, client),
+           :ok <- enforce_channel_limit(state),
+           :ok <- enforce_key(state, key),
+           :ok <- enforce_invite_only(state, client_pid) do
         Logger.info("User #{client.nickname} joined channel #{state.name}")
 
         membership = %{nickname: client.nickname}
         members = Map.put(state.members, client_pid, membership)
         {:reply, {:ok, self()}, %{state | members: members}, {:continue, {:notify_join, client}}}
+      else
+        error ->
+          {:reply, error, state}
+      end
+    else
+      {:reply, :noop, state}
     end
   end
 
@@ -174,21 +180,26 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:privmsg, from, message}, _from, state) do
-    do_broadcast(make_ref(), from, {:privmsg, from, state.name, message}, state)
-    {:reply, :ok, state}
+  def handle_call({:privmsg, from, message}, {client_pid, _}, state) do
+    with :ok <- enforce_no_external_messages(state, client_pid),
+         :ok <- enforce_moderated(state, client_pid) do
+      {:reply, :ok, state, {:continue, {:notify_privmsg, from, message}}}
+    else
+      error ->
+        {:reply, error, state}
+    end
   end
 
   @impl true
   def handle_call({:part, client, reason}, {client_pid, _}, state) do
-    case state.members do
-      %{^client_pid => _} ->
-        Logger.info("User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}")
-        new_members = Map.delete(state.members, client_pid)
-        {:reply, {:ok, self()}, %{state | members: new_members}, {:continue, {:notify_part, client, reason}}}
+    with :ok <- ensure_member(state, client_pid) do
+      Logger.info("User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}")
 
-      _ ->
-        {:reply, {:error, {:not_on_channel, state.name}}, state}
+      new_members = Map.delete(state.members, client_pid)
+      {:reply, {:ok, self()}, %{state | members: new_members}, {:continue, {:notify_part, client, reason}}}
+    else
+      error ->
+        {:reply, error, state}
     end
   end
 
@@ -214,33 +225,34 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_call({:update_mode, operations, client}, {client_pid, _}, state) do
-    # Check if user is channel operator
-    case state.members do
-      %{^client_pid => %{operator?: true}} ->
-        {new_state, applied_changes, errors} =
-          Enum.reduce(operations, {state, [], []}, &apply_mode/2)
+    with :ok <- ensure_member(state, client_pid),
+         :ok <- ensure_operator(state, client_pid) do
+      {new_state, applied_changes, errors} =
+        Enum.reduce(operations, {state, [], []}, &apply_mode/2)
 
-        {:reply, {:ok, {state.name, applied_changes, errors}}, new_state, {:continue, {:notify_mode, client, applied_changes}}}
-
-      _ ->
-        {:reply, {:error, {:chan_o_privs_needed, state.name}}, state}
+      {:reply, {:ok, {state.name, applied_changes, errors}}, new_state, {:continue, {:notify_mode, client, applied_changes}}}
+    else
+      error ->
+        {:reply, error, state}
     end
   end
 
   @impl true
   def handle_call({:update_topic, client, new_topic}, {client_pid, _}, state) do
-        topic =
-          %{
-            topic: new_topic,
-            nick: client.nickname,
-            set_at: DateTime.utc_now()
-          }
+    with :ok <- ensure_member(state, client_pid),
+         :ok <- enforce_protected_topic(state, client_pid) do
+      topic =
+        %{
+          topic: new_topic,
+          nick: client.nickname,
+          set_at: DateTime.utc_now()
+        }
 
-        Logger.info("User #{client.nickname} set topic in #{state.name}: #{inspect(new_topic)}")
-        {:reply, :ok, %{state | topic: topic}, {:continue, {:notify_topic, client, new_topic}}}
-
-      _ ->
-        {:reply, {:error, {:not_on_channel, state.name}}, state}
+      Logger.info("User #{client.nickname} set topic in #{state.name}: #{inspect(new_topic)}")
+      {:reply, :ok, %{state | topic: topic}, {:continue, {:notify_topic, client, new_topic}}}
+    else
+      error ->
+        {:reply, error, state}
     end
   end
 
@@ -291,6 +303,12 @@ defmodule IRCane.Channel do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_continue({:notify_privmsg, client, message}, state) do
+    do_broadcast(make_ref(), client, {:privmsg, client, state.name, message}, state)
+    {:noreply, state}
+  end
+
   defp do_broadcast(ref, from, message, state) do
     state.members
     |> Map.keys()
@@ -313,8 +331,13 @@ defmodule IRCane.Channel do
   defp apply_mode({_op, :protected_topic} = mode, acc), do: apply_boolean_mode(acc, :protected_topic?, mode)
   defp apply_mode({_op, :no_external_messages} = mode, acc), do: apply_boolean_mode(acc, :no_external_messages?, mode)
 
-  defp apply_mode({:add, {:channel_limit, new_limit}}, {state, changes, errors}) when state.channel_limit != new_limit do
-    {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit}} | changes], errors}
+  defp apply_mode({:add, {:channel_limit, new_limit_str}}, {state, changes, errors} = acc) do
+    case Integer.parse(new_limit_str) do
+      {new_limit, _} when new_limit != state.channel_limit ->
+        {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit_str}} | changes], errors}
+      _ ->
+        acc
+    end
   end
 
   defp apply_mode({:remove, :channel_limit}, {state, changes, errors}) when not is_nil(state.channel_limit) do
@@ -338,4 +361,65 @@ defmodule IRCane.Channel do
       _ -> {state, changes, errors}
     end
   end
+
+  defp is_operator?(state, client_pid) do
+    case state.members do
+      %{^client_pid => %{operator?: true}} -> true
+      _ -> false
+    end
+  end
+
+  defp is_voiced?(state, client_pid) do
+    case state.members do
+      %{^client_pid => %{voice?: true}} -> true
+      _ -> false
+    end
+  end
+
+  defp is_member?(state, client_pid) do
+    Map.has_key?(state.members, client_pid)
+  end
+
+  defp ensure_member(state, client_pid) do
+    if is_member?(state, client_pid),
+      do: :ok,
+      else: {:error, {:not_on_channel, state.name}}
+  end
+
+  defp ensure_operator(state, client_pid) do
+    if is_operator?(state, client_pid),
+      do: :ok,
+      else: {:error, {:chan_o_privs_needed, state.name}}
+  end
+
+  defp enforce_ban(_state, _client), do: :ok
+
+  defp enforce_channel_limit(%{channel_limit: nil}), do: :ok
+  defp enforce_channel_limit(state) do
+    if map_size(state.members) < state.channel_limit,
+      do: :ok,
+      else: {:error, {:channel_is_full, state.name}}
+  end
+
+  defp enforce_key(%{key: nil}, _key), do: :ok
+  defp enforce_key(state, key) do
+    if state.key == key,
+      do: :ok,
+      else: {:error, {:bad_channel_key, state.name}}
+  end
+
+  defp enforce_invite_only(_state, _client_pid), do: :ok
+
+  defp enforce_moderated(%{moderated?: false}, _client_pid), do: :ok
+  defp enforce_moderated(state, client_pid) do
+    if is_operator?(state, client_pid) or is_voiced?(state, client_pid),
+      do: :ok,
+      else: {:error, {:cannot_send_to_chan, state.name}}
+  end
+
+  defp enforce_protected_topic(%{protected_topic?: false}, _client_pid), do: :ok
+  defp enforce_protected_topic(state, client_pid), do: ensure_operator(state, client_pid)
+
+  defp enforce_no_external_messages(%{no_external_messages?: false}, _client_pid), do: :ok
+  defp enforce_no_external_messages(state, client_pid), do: ensure_member(state, client_pid)
 end
