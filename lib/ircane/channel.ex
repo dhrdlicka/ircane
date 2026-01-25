@@ -99,15 +99,15 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :topic)
   end
 
-  def topic(channel_name, client, new_topic) when is_binary(channel_name) do
-    topic(via_tuple(channel_name), client, new_topic)
+  def update_topic(channel_name, client, new_topic) when is_binary(channel_name) do
+    update_topic(via_tuple(channel_name), client, new_topic)
   catch
     :exit, {:noproc, _} ->
       {:error, {:no_such_channel, channel_name}}
   end
 
-  def topic(pid, client, new_topic) do
-    GenServer.call(pid, {:topic, client, new_topic})
+  def update_topic(pid, client, new_topic) do
+    GenServer.call(pid, {:update_topic, client, new_topic})
   end
 
   def mode(channel_name) when is_binary(channel_name) do
@@ -228,9 +228,7 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:topic, client, new_topic}, {client_pid, _}, state) do
-    case state.members do
-      %{^client_pid => _} ->
+  def handle_call({:update_topic, client, new_topic}, {client_pid, _}, state) do
         topic =
           %{
             topic: new_topic,

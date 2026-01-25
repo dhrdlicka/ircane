@@ -12,7 +12,7 @@ defmodule IRCane.Commands.Topic do
   def handle([channel_name | topic_parts], state) do
     topic = Enum.join(topic_parts, " ")
 
-    with :ok <- Channel.topic(channel_name, state, topic) do
+    with :ok <- Channel.update_topic(channel_name, state, topic) do
       {:ok, {:topic, state, channel_name, topic}, state}
     end
   end
