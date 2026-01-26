@@ -3,7 +3,6 @@ defmodule IRCane.Commands.Mode do
   alias IRCane.Channel
 
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
-  @mode_opts Application.compile_env!(:ircane, :mode_opts)
 
   def handle(["#" <> _ = target | []], state) do
     with {:ok, {channel_name, modes}} <- Channel.mode(target) do
@@ -15,7 +14,7 @@ defmodule IRCane.Commands.Mode do
     modes =
       params
       |> Mode.parse(@channel_modes)
-      |> Mode.parse_params(@mode_opts)
+      |> Mode.parse_params(@channel_modes)
 
     {mode_changes, lists, invalid} =
       Enum.reduce(modes, {[], [], []}, fn

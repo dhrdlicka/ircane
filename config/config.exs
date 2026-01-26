@@ -2,42 +2,32 @@ import Config
 
 config :ircane,
   channel_modes: %{
-    ?b => {:type_a, :ban},
-    # ?e => {:type_a, :exception}, # non-standard
-    ?l => {:type_c, :channel_limit},
-    ?i => {:type_d, :invite_only},
-    # ?I => {:type_a, :invite_exception}, # non-standard
-    ?k => {:type_b, :key},
-    ?m => {:type_d, :moderated},
-    ?s => {:type_d, :secret},
-    ?t => {:type_d, :protected_topic},
-    ?n => {:type_d, :no_external_messages},
-    # ?q => {:type_b, :founder}, # non-standard
-    # ?a => {:type_b, :protected}, # non-standard
-    ?o => {:type_b, :operator},
-    # ?h => {:type_b, :halfop}, # non-standard
-    ?v => {:type_b, :voice}
+    ?b => {:param_always, :ban, list: true, parse: &BanMask.parse/1, format: &BanMask.format/1},
+    # ?e => {:param_always, :exception, list: true, parse: &BanMask.parse/1, format: &BanMask.format/1}, # non-standard
+    ?l =>
+      {:param_when_set, :channel_limit,
+       parse: &Utils.parse_integer/1, format: &Integer.to_string/1},
+    ?i => {:no_param, :invite_only, []},
+    # ?I => {:param_always, :invite_exception, list: true, parse: &BanMask.parse/1, format: &BanMask.format/1}, # non-standard
+    ?k => {:param_always, :key, []},
+    ?m => {:no_param, :moderated, []},
+    ?s => {:no_param, :secret, []},
+    ?t => {:no_param, :protected_topic, []},
+    ?n => {:no_param, :no_external_messages, []},
+    # ?q => {:param_always, :founder, []}, # non-standard
+    # ?a => {:param_always, :protected, []}, # non-standard
+    ?o => {:param_always, :operator, []},
+    # ?h => {:param_always, :halfop, []}, # non-standard
+    ?v => {:param_always, :voice, []}
   }
 
 config :ircane,
   user_modes: %{
-    ?i => {:type_d, :invisible},
-    ?o => {:type_d, :local_operator},
-    ?O => {:type_d, :global_operator},
-    # ?r => {:type_d, :registered}, # non-standard
-    ?w => {:type_d, :wallops}
-  }
-
-config :ircane,
-  mode_opts: %{
-    channel_limit: [
-      parse: &Utils.parse_integer/1,
-      format: &Integer.to_string/1
-    ],
-    ban: [
-      parse: &BanMask.parse/1,
-      format: &BanMask.format/1
-    ],
+    ?i => {:no_param, :invisible, []},
+    ?o => {:no_param, :local_operator, []},
+    ?O => {:no_param, :global_operator, []},
+    # ?r => {:no_param, :registered, []}, # non-standard
+    ?w => {:no_param, :wallops, []}
   }
 
 config :ircane, prefixes: [voice: ?+, operator: ?@]

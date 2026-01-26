@@ -1,15 +1,21 @@
 defmodule IRCane.Protocol.Mode do
-  @type t :: atom | {atom, String.t()}
+  @type t :: atom | {atom, term}
+  @type opts :: [
+          {:list, boolean}
+          | {:parse, (String.t() -> {:ok, term} | :error)}
+          | {:format, (term -> String.t())}
+        ]
 
-  @type mode_type :: :type_a | :type_b | :type_c | :type_d
+  @type mode_type :: :param_always | :param_when_set | :no_param
 
   @type mode_map :: %{
-          char => {mode_type, atom}
+          char => {mode_type, atom, opts}
         }
 
   @type invalid_reason :: {:unknown_mode, char} | {:invalid_param, atom, String.t()}
 
-  @spec parse(list(String.t()), mode_map) :: list({:add | :remove | :list, t} | {:invalid, invalid_reason})
+  @spec parse(list(String.t()), mode_map) ::
+          list({:add | :remove | :list, t} | {:invalid, invalid_reason})
   def parse([mode_string | args], known_modes),
     do: parse(String.to_charlist(mode_string), args, known_modes, :add, [])
 
@@ -23,28 +29,26 @@ defmodule IRCane.Protocol.Mode do
 
   defp parse([mode | modes_tail], args, known_modes, op, acc) do
     case {op, known_modes, args} do
-      {op, %{^mode => {:type_a, name}}, []} ->
-        parse(modes_tail, [], known_modes, op, [{:list, name} | acc])
+      {op, %{^mode => {:param_always, name, opts}}, []} ->
+        if opts[:list] do
+          parse(modes_tail, args, known_modes, op, [{:list, name} | acc])
+        else
+          parse(modes_tail, args, known_modes, op, [{op, {name, nil}} | acc])
+        end
 
-      {op, %{^mode => {:type_a, name}}, [arg | args]} ->
+      {op, %{^mode => {:param_always, name, _opts}}, [arg | args]} ->
         parse(modes_tail, args, known_modes, op, [{op, {name, arg}} | acc])
 
-      {op, %{^mode => {:type_b, name}}, []} ->
-        parse(modes_tail, args, known_modes, op, [{op, {name, nil}} | acc])
-
-      {op, %{^mode => {:type_b, name}}, [arg | args]} ->
-        parse(modes_tail, args, known_modes, op, [{op, {name, arg}} | acc])
-
-      {:add, %{^mode => {:type_c, name}}, []} ->
+      {:add, %{^mode => {:param_when_set, name, _opts}}, []} ->
         parse(modes_tail, args, known_modes, op, [{:add, {name, nil}} | acc])
 
-      {:add, %{^mode => {:type_c, name}}, [arg | args]} ->
+      {:add, %{^mode => {:param_when_set, name, _opts}}, [arg | args]} ->
         parse(modes_tail, args, known_modes, op, [{:add, {name, arg}} | acc])
 
-      {:remove, %{^mode => {:type_c, name}}, _} ->
+      {:remove, %{^mode => {:param_when_set, name, _opts}}, _} ->
         parse(modes_tail, args, known_modes, op, [{:remove, name} | acc])
 
-      {op, %{^mode => {:type_d, name}}, _} ->
+      {op, %{^mode => {:no_param, name, _opts}}, _} ->
         parse(modes_tail, args, known_modes, op, [{op, name} | acc])
 
       _ ->
@@ -55,16 +59,23 @@ defmodule IRCane.Protocol.Mode do
   defp parse([], _args, _known_modes, _op, acc), do: Enum.reverse(acc)
 
   @spec parse_params(list({atom(), t}), keyword()) :: list({atom(), t})
-  def parse_params(modes, opts) do
+  def parse_params(modes, known_modes) do
+    known_modes = invert(known_modes)
+
     Enum.map(modes, fn
-      {op, {name, arg}} when is_map_key(opts, name) ->
-        with parse_fn = Keyword.get(opts[name], :parse, &(&1)),
-             {:ok, parsed} <- parse_fn.(arg) do
-          {op, {name, parsed}}
+      {op, {name, arg}} ->
+        {_letter, _type, opts} = known_modes[name]
+        parse_fn = opts[:parse]
+
+        if parse_fn do
+          case parse_fn.(arg) do
+            {:ok, parsed} -> {op, {name, parsed}}
+            :error -> {:invalid, {:invalid_param, name, arg}}
+          end
         else
-          _ ->
-            {:invalid, {:invalid_param, name, arg}}
+          {op, {name, arg}}
         end
+
       other ->
         other
     end)
@@ -77,7 +88,7 @@ defmodule IRCane.Protocol.Mode do
   defp invert(modes),
     do:
       Enum.reduce(modes, %{}, fn
-        {letter, {type, name}}, acc -> Map.put(acc, name, {type, letter})
+        {letter, {type, name, opts}}, acc -> Map.put(acc, name, {type, letter, opts})
       end)
 
   defp build([{:add, _} | _] = modes, known_modes, op, {mode_string, args}) when op != :add,
@@ -89,7 +100,7 @@ defmodule IRCane.Protocol.Mode do
 
   defp build([{_op, {name, arg}} | modes], known_modes, op, {mode_string, args} = acc) do
     case known_modes do
-      %{^name => {_, letter}} ->
+      %{^name => {_, letter, _opts}} ->
         build(modes, known_modes, op, {[letter | mode_string], [arg | args]})
 
       _ ->
@@ -99,7 +110,7 @@ defmodule IRCane.Protocol.Mode do
 
   defp build([{_op, name} | modes], known_modes, op, {mode_string, args} = acc) do
     case known_modes do
-      %{^name => {_, letter}} ->
+      %{^name => {_, letter, _opts}} ->
         build(modes, known_modes, op, {[letter | mode_string], args})
 
       _ ->
@@ -119,11 +130,16 @@ defmodule IRCane.Protocol.Mode do
   end
 
   @spec format_params(list({atom(), t}), keyword()) :: list({atom(), t})
-  def format_params(modes, opts) do
+  def format_params(modes, known_modes) do
+    known_modes = invert(known_modes)
+
     Enum.map(modes, fn
-      {op, {name, arg}} when is_map_key(opts, name) ->
-        format_fn = Keyword.get(opts[name], :format, &inspect/1)
+      {op, {name, arg}} when not is_binary(arg) ->
+        {_letter, _type, opts} = known_modes[name]
+        format_fn = opts[:format] || (&inspect/1)
+
         {op, {name, format_fn.(arg)}}
+
       other ->
         other
     end)
