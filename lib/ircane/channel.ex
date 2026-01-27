@@ -148,10 +148,13 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:join, client, _key}, {client_pid, _}, state) when map_size(state.members) == 0 do
+  def handle_call({:join, client, _key}, {client_pid, _}, state)
+      when map_size(state.members) == 0 do
     # First user to join an empty non-permanent channel becomes operator
     Logger.notice("User #{client.nickname} created channel #{state.name}")
-    {:reply, {:ok, self()}, %{state | members: %{client_pid => %{nickname: client.nickname, operator?: true}}}}
+    membership = %{nickname: client.nickname, operator?: true, voice?: false}
+
+    {:reply, {:ok, self()}, %{state | members: %{client_pid => membership}}}
   end
 
   @impl true
@@ -163,7 +166,7 @@ defmodule IRCane.Channel do
            :ok <- enforce_invite_only(state, client_pid) do
         Logger.info("User #{client.nickname} joined channel #{state.name}")
 
-        membership = %{nickname: client.nickname}
+        membership = %{nickname: client.nickname, operator?: false, voice?: false}
         members = Map.put(state.members, client_pid, membership)
         {:reply, {:ok, self()}, %{state | members: members}, {:continue, {:notify_join, client}}}
       else
@@ -340,6 +343,12 @@ defmodule IRCane.Channel do
   defp apply_mode({_op, :protected_topic} = mode, acc), do: apply_boolean_mode(acc, :protected_topic?, mode)
   defp apply_mode({_op, :no_external_messages} = mode, acc), do: apply_boolean_mode(acc, :no_external_messages?, mode)
 
+  defp apply_mode({_op, {:operator, _nickname}} = mode, acc),
+    do: apply_prefix_mode(acc, :operator?, mode)
+
+  defp apply_mode({_op, {:voice, _nickname}} = mode, acc),
+    do: apply_prefix_mode(acc, :voice?, mode)
+
   defp apply_mode({:add, {:channel_limit, new_limit}}, {state, changes, errors}) when new_limit != state.channel_limit do
     {%{state | channel_limit: new_limit}, [{:add, {:channel_limit, new_limit}} | changes], errors}
   end
@@ -382,6 +391,39 @@ defmodule IRCane.Channel do
       {:remove, true} -> {Map.put(state, field_name, false), [change | changes], errors}
       _ -> {state, changes, errors}
     end
+  end
+
+  defp apply_prefix_mode({state, changes, errors}, field_name, {op, {mode_name, nickname}}) do
+    with {:ok, pid, membership} <- fetch_member(state, nickname) do
+      case {op, membership[field_name] || false} do
+        {:add, false} ->
+          updated_members = %{state.members | pid => Map.put(membership, field_name, true)}
+          op_change = {op, {mode_name, membership.nickname}}
+          {%{state | members: updated_members}, [op_change | changes], errors}
+
+        {:remove, true} ->
+          updated_members = %{state.members | pid => Map.put(membership, field_name, false)}
+          op_change = {op, {mode_name, membership.nickname}}
+          {%{state | members: updated_members}, [op_change | changes], errors}
+
+        _ ->
+          {state, changes, errors}
+      end
+    else
+      {:error, reason} ->
+        {state, changes, [reason | errors]}
+    end
+  end
+
+  defp fetch_member(state, nickname) do
+    downcased = String.downcase(nickname)
+
+    Enum.find_value(state.members, {:error, {:no_such_nick, nickname}}, fn
+      {pid, %{nickname: member_nick} = membership} ->
+        if String.downcase(member_nick) == downcased,
+          do: {:ok, pid, membership},
+          else: false
+    end)
   end
 
   defp is_operator?(state, client_pid) do
