@@ -23,6 +23,8 @@ defmodule IRCane.Client do
             seen_events: :queue.new(),
             joined_channels: MapSet.new()
 
+  @type t :: any()
+
   @event_dedup_size 1_000
   @max_buffer 8_192
   @max_line 510
@@ -137,7 +139,9 @@ defmodule IRCane.Client do
 
   @impl true
   def handle_info({:tcp, socket, packet}, state) do
-    Logger.debug("[#{state.nickname || state.hostname || "unknown"}] Received: #{String.trim(packet)}")
+    Logger.debug(
+      "[#{state.nickname || state.hostname || "unknown"}] Received: #{String.trim(packet)}"
+    )
 
     state = handle_packet(packet, state)
 
@@ -196,7 +200,10 @@ defmodule IRCane.Client do
     buffer = state.buffer <> packet
 
     if byte_size(buffer) > @max_buffer do
-      Logger.warning("Buffer overflow for client #{state.nickname || state.hostname || "unknown"}: #{byte_size(buffer)} bytes")
+      Logger.warning(
+        "Buffer overflow for client #{state.nickname || state.hostname || "unknown"}: #{byte_size(buffer)} bytes"
+      )
+
       %{state | disconnecting?: true, quit_message: "Buffer overflow"}
     else
       {lines, rest} = split_lines(buffer)
@@ -217,7 +224,10 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
-    Logger.warning("Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes")
+    Logger.warning(
+      "Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes"
+    )
+
     state
   end
 
@@ -229,7 +239,10 @@ defmodule IRCane.Client do
       |> register()
     else
       {:error, reason} ->
-        Logger.debug("Failed to parse message from #{state.nickname || state.hostname || "unknown"}: #{inspect(reason)}")
+        Logger.debug(
+          "Failed to parse message from #{state.nickname || state.hostname || "unknown"}: #{inspect(reason)}"
+        )
+
         state
     end
   end
@@ -256,14 +269,17 @@ defmodule IRCane.Client do
   end
 
   defp run_command(command, _params, %{registered?: false} = _state)
-  when command not in @unregistered_commands do
+       when command not in @unregistered_commands do
     {:error, :not_registered}
   end
 
   defp run_command(command, params, state) do
     case Map.get(@command_handlers, command) do
       nil ->
-        Logger.debug("Unknown command from #{state.nickname || state.hostname || "unknown"}: #{command}")
+        Logger.debug(
+          "Unknown command from #{state.nickname || state.hostname || "unknown"}: #{command}"
+        )
+
         {:error, {:unknown_command, command}}
 
       handler ->
@@ -271,7 +287,8 @@ defmodule IRCane.Client do
     end
   end
 
-  defp register(%{registered?: false,nickname: nick, username: user} = state) when not is_nil(nick) and not is_nil(user) do
+  defp register(%{registered?: false, nickname: nick, username: user} = state)
+       when not is_nil(nick) and not is_nil(user) do
     Logger.notice("User registered: #{state.nickname}!#{state.username}@#{state.hostname}")
 
     [:welcome, :your_host, :created, :my_info, :i_support]
@@ -293,7 +310,11 @@ defmodule IRCane.Client do
   defp send_message(%Message{} = message, state) do
     raw_message = Message.build(message) <> "\r\n"
     :gen_tcp.send(state.socket, raw_message)
-    Logger.debug("[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}")
+
+    Logger.debug(
+      "[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}"
+    )
+
     :ok
   end
 

@@ -26,7 +26,10 @@ defmodule IRCane.Commands.Mode do
 
     unknown_modes =
       invalid
-      |> Enum.filter(fn {:unknown_mode, _} -> true; _ -> false end)
+      |> Enum.filter(fn
+        {:unknown_mode, _} -> true
+        _ -> false
+      end)
       |> Enum.uniq()
 
     lists =
@@ -35,7 +38,7 @@ defmodule IRCane.Commands.Mode do
       |> Enum.map(&list(target, &1))
 
     {mode, errors} =
-      case Channel.update_mode(target, mode_changes, state) do
+      case Channel.update_mode(target, state, mode_changes) do
         {:ok, {_name, [], errors}} ->
           {nil, errors}
 
@@ -46,7 +49,7 @@ defmodule IRCane.Commands.Mode do
           {nil, [reason]}
       end
 
-    replies = unknown_modes ++ lists ++ errors ++ (if mode, do: [mode], else: [])
+    replies = unknown_modes ++ lists ++ errors ++ if mode, do: [mode], else: []
 
     {:ok, replies, state}
   end

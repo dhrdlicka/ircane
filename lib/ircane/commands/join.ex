@@ -86,7 +86,8 @@ defmodule IRCane.Commands.Join do
       {:ok, pid}
     else
       {:error, {:no_such_channel, _channel_name}} ->
-        with {:ok, pid} <- DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
+        with {:ok, pid} <-
+               DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
           Channel.join(pid, state, key)
         else
           {:error, {:already_started, _pid}} ->
