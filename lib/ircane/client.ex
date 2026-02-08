@@ -50,6 +50,17 @@ defmodule IRCane.Client do
     GenServer.start_link(__MODULE__, socket)
   end
 
+  def state(nickname) when is_binary(nickname) do
+    state(via_tuple(nickname))
+  catch
+    :exit, {:noproc, _} ->
+      {:error, {:no_such_nick, nickname}}
+  end
+
+  def state(pid) do
+    GenServer.call(pid, :state)
+  end
+
   @spec socket_ready(pid :: pid()) :: :ok
   def socket_ready(pid) do
     GenServer.cast(pid, :socket_ready)
@@ -84,6 +95,11 @@ defmodule IRCane.Client do
   @impl true
   def init(socket) do
     {:ok, %__MODULE__{socket: socket, pid: self()}, {:continue, :init}}
+  end
+
+  @impl true
+  def handle_call(:state, _from, state) do
+    {:reply, {:ok, state}, state}
   end
 
   @impl true
