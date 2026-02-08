@@ -30,4 +30,29 @@ config :ircane,
     ?w => {:no_param, :wallops, []}
   }
 
-config :ircane, prefixes: [voice: ?+, operator: ?@]
+config :ircane,
+  roles: [
+    {:voice,
+     %{
+       prefix: ?+
+     }},
+    {:halfop,
+     %{
+       prefix: ?%,
+       highest_target: :voice
+     }},
+    {:operator,
+     %{
+       prefix: ?@
+     }},
+    {:protect,
+     %{
+       prefix: ?&,
+       highest_target: :operator
+     }},
+    {:founder,
+     %{
+       prefix: ?~,
+       highest_target: :protect
+     }}
+  ]

@@ -1,12 +1,12 @@
 defmodule IRCane.Channel.Membership do
+  alias IRCane.Channel.Role
+
   defstruct nickname: nil,
-            operator?: false,
-            voice?: false
+            roles: []
 
   @type t ::
           %__MODULE__{
             nickname: String.t(),
-            operator?: boolean(),
-            voice?: boolean()
+            roles: [Role.t()]
           }
 end

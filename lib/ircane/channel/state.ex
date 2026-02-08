@@ -1,6 +1,7 @@
 defmodule IRCane.Channel.State do
   alias IRCane.BanMask
   alias IRCane.Channel.Membership
+  alias IRCane.Channel.Role
   alias IRCane.Channel.Topic
   alias IRCane.Client
   alias IRCane.Protocol.Mode
@@ -38,7 +39,8 @@ defmodule IRCane.Channel.State do
   def join(channel_state, client, key \\ nil) do
     if not is_member?(channel_state, client.pid) do
       with :ok <- authorize(channel_state, :join, client, key: key) do
-        membership = %Membership{nickname: client.nickname, operator?: channel_state.new}
+        roles = if channel_state.new, do: [:operator], else: []
+        membership = %Membership{nickname: client.nickname, roles: roles}
         members = Map.put(channel_state.members, client.pid, membership)
 
         {:ok, %{channel_state | members: members, new: false}}
@@ -154,10 +156,10 @@ defmodule IRCane.Channel.State do
     do: apply_boolean_mode(channel_state, :no_external_messages?, update)
 
   defp apply_mode(channel_state, {_op, {:operator, _nickname}} = update),
-    do: apply_prefix_mode(channel_state, :operator?, update)
+    do: apply_prefix_mode(channel_state, update)
 
   defp apply_mode(channel_state, {_op, {:voice, _nickname}} = update),
-    do: apply_prefix_mode(channel_state, :voice?, update)
+    do: apply_prefix_mode(channel_state, update)
 
   defp apply_mode(
          %{modes: %{channel_limit: old_limit}} = channel_state,
@@ -209,16 +211,20 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  defp apply_prefix_mode(channel_state, field_name, {op, {mode_name, nickname}}) do
-    with {:ok, pid, membership} <- fetch_member(channel_state, nickname) do
-      case {op, membership} do
-        {:add, %{^field_name => false}} ->
-          members = %{channel_state.members | pid => struct!(membership, [{field_name, true}])}
+  defp apply_prefix_mode(channel_state, {op, {mode_name, nickname}}) do
+    with {:ok, {pid, membership}} <- fetch_member(channel_state, nickname) do
+      has_role = mode_name in membership.roles
+
+      case {op, has_role} do
+        {:add, false} ->
+          membership = %{membership | roles: [mode_name | membership.roles]}
+          members = %{channel_state.members | pid => membership}
           update = {op, {mode_name, membership.nickname}}
           {:ok, %{channel_state | members: members}, update}
 
-        {:remove, %{^field_name => true}} ->
-          members = %{channel_state.members | pid => struct!(membership, [{field_name, false}])}
+        {:remove, true} ->
+          membership = %{membership | roles: List.delete(membership.roles, mode_name)}
+          members = %{channel_state.members | pid => membership}
           update = {op, {mode_name, membership.nickname}}
           {:ok, %{channel_state | members: members}, update}
 
@@ -281,24 +287,34 @@ defmodule IRCane.Channel.State do
     downcased = String.downcase(nickname)
 
     Enum.find_value(channel_state.members, {:error, {:no_such_nick, nickname}}, fn
-      {pid, %{nickname: member_nick} = membership} ->
+      {_pid, %{nickname: member_nick}} = pair ->
         if String.downcase(member_nick) == downcased,
-          do: {:ok, pid, membership},
+          do: {:ok, pair},
           else: false
     end)
   end
 
   defp is_operator?(channel_state, client_pid) do
     case channel_state.members do
-      %{^client_pid => %{operator?: true}} -> true
-      _ -> false
+      %{^client_pid => %{roles: roles}} ->
+        roles
+        |> Role.max()
+        |> Role.compare(:operator) >= 0
+
+      _ ->
+        false
     end
   end
 
   defp is_voiced?(channel_state, client_pid) do
     case channel_state.members do
-      %{^client_pid => %{voice?: true}} -> true
-      _ -> false
+      %{^client_pid => %{roles: roles}} ->
+        roles
+        |> Role.max()
+        |> Role.compare(:voice) >= 0
+
+      _ ->
+        false
     end
   end
 

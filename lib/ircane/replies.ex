@@ -1,4 +1,5 @@
 defmodule IRCane.Replies do
+  alias IRCane.Channel.Role
   alias IRCane.Protocol.Message
   alias IRCane.Protocol.Mode
 
@@ -196,9 +197,9 @@ defmodule IRCane.Replies do
     member_list =
       members
       |> Enum.map(fn
-        %{nickname: nickname, operator?: true} -> <<@prefixes[:operator]>> <> nickname
-        %{nickname: nickname, voice?: true} -> <<@prefixes[:voice]>> <> nickname
-        %{nickname: nickname} -> nickname
+        %{nickname: nickname, roles: roles} ->
+          prefix = roles |> Role.max() |> Role.prefix()
+          prefix <> nickname
       end)
       |> Enum.join(" ")
 
