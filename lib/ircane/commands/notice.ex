@@ -17,12 +17,12 @@ defmodule IRCane.Commands.Notice do
     {:error, {:need_more_params, "NOTICE"}}
   end
 
-  defp dispatch("#" <> _ = target,  message, state) do
+  defp dispatch("#" <> _ = target, message, state) do
     Channel.notice(target, state, message)
     :ok
   end
 
-  defp dispatch(target,  message, state) do
+  defp dispatch(target, message, state) do
     Client.notice(target, state, message)
     :ok
   end

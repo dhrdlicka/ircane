@@ -8,51 +8,110 @@ defmodule IRCane.Replies do
   @version "ircane-0.1"
   @created_date DateTime.utc_now()
 
-  @prefixes Application.compile_env!(:ircane, :prefixes)
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   defp format_numeric(reply, client) do
     case reply do
       :welcome ->
-        %Message{source: @server_name, command: "001", params: [client, "Welcome to the #{@network_name} Network, #{client}"]}
+        %Message{
+          source: @server_name,
+          command: "001",
+          params: [client, "Welcome to the #{@network_name} Network, #{client}"]
+        }
 
       :your_host ->
-        %Message{source: @server_name, command: "002", params: [client, "Your host is #{@server_name}, running version #{@version}"]}
+        %Message{
+          source: @server_name,
+          command: "002",
+          params: [client, "Your host is #{@server_name}, running version #{@version}"]
+        }
 
       :created ->
-        %Message{source: @server_name, command: "003", params: [client, "This server was created #{@created_date}"]}
+        %Message{
+          source: @server_name,
+          command: "003",
+          params: [client, "This server was created #{@created_date}"]
+        }
 
       :my_info ->
-        %Message{source: @server_name, command: "004", params: [client, @server_name, @version, "ioOw", "blikmstnov", "blkov"]}
+        %Message{
+          source: @server_name,
+          command: "004",
+          params: [client, @server_name, @version, "ioOw", "blikmstnov", "blkov"]
+        }
 
       :i_support ->
-        %Message{source: @server_name, command: "005", params: [client, "CASEMAPPING=ascii", "CHANMODES=b,k,l,imnst", "CHANTYPES=#", "MODES=4", "NETWORK=#{@network_name}", "PREFIX=(ov)@+", "are supported by this server"]}
+        %Message{
+          source: @server_name,
+          command: "005",
+          params: [
+            client,
+            "CASEMAPPING=ascii",
+            "CHANMODES=b,k,l,imnst",
+            "CHANTYPES=#",
+            "MODES=4",
+            "NETWORK=#{@network_name}",
+            "PREFIX=(ov)@+",
+            "are supported by this server"
+          ]
+        }
 
       {:luser_client, users, invisibles, servers} ->
-        %Message{source: @server_name, command: "251", params: [client, "There are #{users} users and #{invisibles} invisible on #{servers} servers"]}
+        %Message{
+          source: @server_name,
+          command: "251",
+          params: [
+            client,
+            "There are #{users} users and #{invisibles} invisible on #{servers} servers"
+          ]
+        }
 
       {:luser_op, operators} ->
-        %Message{source: @server_name, command: "252", params: [client, "#{operators}", "operator(s) online"]}
+        %Message{
+          source: @server_name,
+          command: "252",
+          params: [client, "#{operators}", "operator(s) online"]
+        }
 
       {:luser_unknown, unknown} ->
-        %Message{source: @server_name, command: "253", params: [client, "#{unknown}", "unknown connection(s)"]}
+        %Message{
+          source: @server_name,
+          command: "253",
+          params: [client, "#{unknown}", "unknown connection(s)"]
+        }
 
       {:luser_channels, channels} ->
-        %Message{source: @server_name, command: "254", params: [client, "#{channels}", "channels formed"]}
+        %Message{
+          source: @server_name,
+          command: "254",
+          params: [client, "#{channels}", "channels formed"]
+        }
 
       {:luser_me, clients, servers} ->
-        %Message{source: @server_name, command: "255", params: [client, "I have #{clients} clients and #{servers} servers"]}
+        %Message{
+          source: @server_name,
+          command: "255",
+          params: [client, "I have #{clients} clients and #{servers} servers"]
+        }
 
       {:local_users, users, max} ->
-        %Message{source: @server_name, command: "265", params: [client, users, max, "Current local users: #{users}, max: #{max}"]}
+        %Message{
+          source: @server_name,
+          command: "265",
+          params: [client, users, max, "Current local users: #{users}, max: #{max}"]
+        }
 
       {:global_users, users, max} ->
-        %Message{source: @server_name, command: "266", params: [client, users, max, "Current global users: #{users}, max: #{max}"]}
+        %Message{
+          source: @server_name,
+          command: "266",
+          params: [client, users, max, "Current global users: #{users}, max: #{max}"]
+        }
 
       {:channel_mode_is, target, modes} ->
         mode_strings =
           modes
-          |> Enum.map(&({:add, &1}))
+          |> Enum.map(&{:add, &1})
           |> Mode.build(@channel_modes)
 
         %Message{source: @server_name, command: "324", params: [client, target | mode_strings]}
@@ -61,76 +120,160 @@ defmodule IRCane.Replies do
         %Message{source: @server_name, command: "353", params: [client, "=", channel, names]}
 
       {:end_of_names, channel} ->
-        %Message{source: @server_name, command: "366", params: [client, channel, "End of /NAMES list"]}
+        %Message{
+          source: @server_name,
+          command: "366",
+          params: [client, channel, "End of /NAMES list"]
+        }
 
       {:ban_list, target, mask} ->
         %Message{source: @server_name, command: "367", params: [client, target, mask]}
 
       {:end_of_ban_list, target} ->
-        %Message{source: @server_name, command: "368", params: [client, target, "End of channel ban list"]}
+        %Message{
+          source: @server_name,
+          command: "368",
+          params: [client, target, "End of channel ban list"]
+        }
 
       {:no_such_nick, nickname} ->
-        %Message{source: @server_name, command: "401", params: [client, nickname, "No such nick/channel"]}
+        %Message{
+          source: @server_name,
+          command: "401",
+          params: [client, nickname, "No such nick/channel"]
+        }
 
       {:no_such_channel, channel} ->
-        %Message{source: @server_name, command: "403", params: [client, channel, "No such channel"]}
+        %Message{
+          source: @server_name,
+          command: "403",
+          params: [client, channel, "No such channel"]
+        }
 
       {:no_topic, channel} ->
-        %Message{source: @server_name, command: "331", params: [client, channel, "No topic is set"]}
+        %Message{
+          source: @server_name,
+          command: "331",
+          params: [client, channel, "No topic is set"]
+        }
 
       {:topic, channel, topic} ->
         %Message{source: @server_name, command: "332", params: [client, channel, topic]}
 
       {:topic_who_time, channel, nick, set_at} ->
-        %Message{source: @server_name, command: "333", params: [client, channel, nick, "#{DateTime.to_unix(set_at)}"]}
+        %Message{
+          source: @server_name,
+          command: "333",
+          params: [client, channel, nick, "#{DateTime.to_unix(set_at)}"]
+        }
 
       {:cannot_send_to_chan, channel} ->
-        %Message{source: @server_name, command: "404", params: [client, channel, "Cannot send to channel"]}
+        %Message{
+          source: @server_name,
+          command: "404",
+          params: [client, channel, "Cannot send to channel"]
+        }
 
       {:unknown_command, command} ->
-        %Message{source: @server_name, command: "421", params: [client, command, "Unknown command"]}
+        %Message{
+          source: @server_name,
+          command: "421",
+          params: [client, command, "Unknown command"]
+        }
 
       :no_motd ->
         %Message{source: @server_name, command: "422", params: [client, "MOTD File is missing"]}
 
       {:erroneous_nickname, nickname} ->
-        %Message{source: @server_name, command: "432", params: [client, nickname, "Erroneus nickname"]}
+        %Message{
+          source: @server_name,
+          command: "432",
+          params: [client, nickname, "Erroneus nickname"]
+        }
 
       {:not_on_channel, channel} ->
-        %Message{source: @server_name, command: "442", params: [client, channel, "You're not on that channel"]}
+        %Message{
+          source: @server_name,
+          command: "442",
+          params: [client, channel, "You're not on that channel"]
+        }
 
       {:bad_chan_mask, channel} ->
-        %Message{source: @server_name, command: "442", params: [client, channel, "Bad Channel Mask"]}
+        %Message{
+          source: @server_name,
+          command: "442",
+          params: [client, channel, "Bad Channel Mask"]
+        }
 
       {:nickname_in_use, nickname} ->
-        %Message{source: @server_name, command: "433", params: [client, nickname, "Nickname is already in use"]}
+        %Message{
+          source: @server_name,
+          command: "433",
+          params: [client, nickname, "Nickname is already in use"]
+        }
 
       :not_registered ->
-        %Message{source: @server_name, command: "451", params: [client, "You have not registered"]}
+        %Message{
+          source: @server_name,
+          command: "451",
+          params: [client, "You have not registered"]
+        }
 
       {:channel_is_full, channel} ->
-        %Message{source: @server_name, command: "471", params: [client, channel, "Cannot join channel (+l)"]}
+        %Message{
+          source: @server_name,
+          command: "471",
+          params: [client, channel, "Cannot join channel (+l)"]
+        }
 
       {:unknown_mode, mode} ->
-        %Message{source: @server_name, command: "472", params: [client, <<mode::utf8>>, "is unknown mode char to me"]}
+        %Message{
+          source: @server_name,
+          command: "472",
+          params: [client, <<mode::utf8>>, "is unknown mode char to me"]
+        }
 
       {:banned_from_chan, channel} ->
-        %Message{source: @server_name, command: "474", params: [client, channel, "Cannot join channel (+b)"]}
+        %Message{
+          source: @server_name,
+          command: "474",
+          params: [client, channel, "Cannot join channel (+b)"]
+        }
 
       {:bad_channel_key, channel} ->
-        %Message{source: @server_name, command: "475", params: [client, channel, "Cannot join channel (+k)"]}
+        %Message{
+          source: @server_name,
+          command: "475",
+          params: [client, channel, "Cannot join channel (+k)"]
+        }
 
       {:chan_o_privs_needed, channel} ->
-        %Message{source: @server_name, command: "482", params: [client, channel, "You're not channel operator"]}
+        %Message{
+          source: @server_name,
+          command: "482",
+          params: [client, channel, "You're not channel operator"]
+        }
 
       :users_dont_match ->
-        %Message{source: @server_name, command: "502", params: [client, "Cant change mode for other users"]}
+        %Message{
+          source: @server_name,
+          command: "502",
+          params: [client, "Cant change mode for other users"]
+        }
 
       {:need_more_params, command} ->
-        %Message{source: @server_name, command: "461", params: [client, command, "Not enough parameters"]}
+        %Message{
+          source: @server_name,
+          command: "461",
+          params: [client, command, "Not enough parameters"]
+        }
 
       other ->
-        %Message{source: @server_name, command: "400", params: [client, "Unknown message: #{inspect(other)}"]}
+        %Message{
+          source: @server_name,
+          command: "400",
+          params: [client, "Unknown message: #{inspect(other)}"]
+        }
     end
   end
 
@@ -234,7 +377,7 @@ defmodule IRCane.Replies do
 
   def format_message({:ban_list, target, bans}, client) do
     bans
-    |> Enum.map(&({:ban_list, target, &1}))
+    |> Enum.map(&{:ban_list, target, &1})
     |> Kernel.++([{:end_of_ban_list, target}])
     |> Enum.map(&format_numeric(&1, client))
   end

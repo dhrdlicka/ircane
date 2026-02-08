@@ -37,7 +37,8 @@ defmodule IRCane.Channel do
     GenServer.cast(pid, {:broadcast_quit, ref, from, quit_message})
   end
 
-  @spec join(String.t() | GenServer.server(), Client.t(), String.t() | nil) :: {:ok, pid()} | :noop | {:error, term()}
+  @spec join(String.t() | GenServer.server(), Client.t(), String.t() | nil) ::
+          {:ok, pid()} | :noop | {:error, term()}
   def join(channel_name, client, key) when is_binary(channel_name) do
     join(via_tuple(channel_name), client, key)
   catch
@@ -49,7 +50,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:join, client, key})
   end
 
-  @spec part(String.t() | GenServer.server(), Client.t(), String.t()) :: {:ok, pid()} | {:error, term()}
+  @spec part(String.t() | GenServer.server(), Client.t(), String.t()) ::
+          {:ok, pid()} | {:error, term()}
   def part(channel_name, client, reason) when is_binary(channel_name) do
     part(via_tuple(channel_name), client, reason)
   catch
@@ -61,7 +63,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:part, client, reason})
   end
 
-  @spec names(String.t() | GenServer.server()) :: {:ok, {String.t(), [Membership.t()]}} | {:error, term()}
+  @spec names(String.t() | GenServer.server()) ::
+          {:ok, {String.t(), [Membership.t()]}} | {:error, term()}
   def names(channel_name) when is_binary(channel_name) do
     names(via_tuple(channel_name))
   catch
@@ -97,7 +100,8 @@ defmodule IRCane.Channel do
     GenServer.cast(pid, {:notice, client, message})
   end
 
-  @spec topic(String.t() | GenServer.server()) :: {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
+  @spec topic(String.t() | GenServer.server()) ::
+          {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
   def topic(channel_name) when is_binary(channel_name) do
     topic(via_tuple(channel_name))
   catch
@@ -109,7 +113,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :topic)
   end
 
-  @spec update_topic(String.t() | GenServer.server(), Client.t(), String.t()) :: :ok | {:error, term()}
+  @spec update_topic(String.t() | GenServer.server(), Client.t(), String.t()) ::
+          :ok | {:error, term()}
   def update_topic(channel_name, client, new_topic) when is_binary(channel_name) do
     update_topic(via_tuple(channel_name), client, new_topic)
   catch
@@ -121,7 +126,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:update_topic, client, new_topic})
   end
 
-  @spec mode(String.t() | GenServer.server()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
+  @spec mode(String.t() | GenServer.server()) ::
+          {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
   def mode(channel_name) when is_binary(channel_name) do
     mode(via_tuple(channel_name))
   catch
@@ -133,7 +139,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :mode)
   end
 
-  @spec update_mode(String.t() | GenServer.server(), Client.t(), list({:add | :remove, Mode.t()})) :: {:ok, {String.t(), [Mode.t()], [atom()]}} | {:error, term()}
+  @spec update_mode(String.t() | GenServer.server(), Client.t(), list({:add | :remove, Mode.t()})) ::
+          {:ok, {String.t(), [Mode.t()], [atom()]}} | {:error, term()}
   def update_mode(channel_name, client, updates) when is_binary(channel_name) do
     update_mode(via_tuple(channel_name), client, updates)
   catch
@@ -205,7 +212,10 @@ defmodule IRCane.Channel do
   def handle_call({:part, client, reason}, _from, state) do
     case ChannelState.part(state, client) do
       {:ok, new_state} ->
-        Logger.info("User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}")
+        Logger.info(
+          "User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}"
+        )
+
         {:reply, {:ok, self()}, new_state, {:continue, {:notify_part, client, reason}}}
 
       other ->
@@ -239,7 +249,8 @@ defmodule IRCane.Channel do
   def handle_call({:update_mode, client, updates}, _from, state) do
     case ChannelState.update_mode(state, client, updates) do
       {:ok, {new_state, applied_updates, errors}} ->
-        {:reply, {:ok, {state.name, applied_updates, errors}}, new_state, {:continue, {:notify_mode, client, applied_updates}}}
+        {:reply, {:ok, {state.name, applied_updates, errors}}, new_state,
+         {:continue, {:notify_mode, client, applied_updates}}}
 
       other ->
         {:reply, other, state}
@@ -260,7 +271,10 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_cast({:broadcast_nick, ref, client, new_nickname}, state) do
-    Logger.debug("Broadcasting nick change in #{state.name}: #{client.nickname} -> #{new_nickname}")
+    Logger.debug(
+      "Broadcasting nick change in #{state.name}: #{client.nickname} -> #{new_nickname}"
+    )
+
     do_broadcast(ref, client, {:nick, client, new_nickname}, state)
 
     {:noreply, ChannelState.update_member_nickname(state, client)}

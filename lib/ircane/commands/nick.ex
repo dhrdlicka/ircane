@@ -31,7 +31,6 @@ defmodule IRCane.Commands.Nick do
       else
         {:ok, new_state}
       end
-
     else
       {:error, {:already_registered, _}} ->
         Logger.debug("Nickname #{new_nickname} already in use")
