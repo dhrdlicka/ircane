@@ -1,21 +1,21 @@
 defmodule IRCane.Protocol.Mode do
   @type t :: atom | {atom, term}
-  @type opts :: [
-          {:list, boolean}
-          | {:parse, (String.t() -> {:ok, term} | :error)}
-          | {:format, (term -> String.t())}
-        ]
-
-  @type mode_type :: :param_always | :param_when_set | :no_param
 
   @type mode_map :: %{
-          char => {mode_type, atom, opts}
+          char =>
+            {:param_always | :param_when_set | :no_param, atom,
+             [
+               {:list, boolean}
+               | {:parse, (String.t() -> {:ok, term} | :error)}
+               | {:format, (term -> String.t())}
+             ]}
         }
 
-  @type invalid_reason :: {:unknown_mode, char} | {:invalid_param, atom, String.t()}
+  @type mode_change :: {:add | :remove, t()}
+  @type mode_list :: {:list, atom}
+  @type invalid_mode :: {:invalid, {:unknown_mode, char} | {:invalid_param, atom, String.t()}}
 
-  @spec parse(list(String.t()), mode_map) ::
-          list({:add | :remove | :list, t} | {:invalid, invalid_reason})
+  @spec parse([String.t()], mode_map) :: [mode_change() | mode_list() | invalid_mode()]
   def parse([mode_string | args], known_modes),
     do: parse(String.to_charlist(mode_string), args, known_modes, :add, [])
 
@@ -58,7 +58,7 @@ defmodule IRCane.Protocol.Mode do
 
   defp parse([], _args, _known_modes, _op, acc), do: Enum.reverse(acc)
 
-  @spec parse_params(list({atom(), t}), keyword()) :: list({atom(), t})
+  @spec parse_params([mode_change()], keyword()) :: [mode_change() | invalid_mode()]
   def parse_params(modes, known_modes) do
     known_modes = invert(known_modes)
 
@@ -81,7 +81,7 @@ defmodule IRCane.Protocol.Mode do
     end)
   end
 
-  @spec build(list({:add | :remove, t}), mode_map) :: list(String.t())
+  @spec build([mode_change()], mode_map) :: list(String.t())
   def build(modes, known_modes),
     do: build(modes, invert(known_modes), nil, {[], []})
 
@@ -129,7 +129,7 @@ defmodule IRCane.Protocol.Mode do
     [modes | Enum.reverse(args)]
   end
 
-  @spec format_params(list({atom(), t}), keyword()) :: list({atom(), t})
+  @spec format_params([mode_change()], keyword()) :: [mode_change()]
   def format_params(modes, known_modes) do
     known_modes = invert(known_modes)
 

@@ -1,6 +1,7 @@
 defmodule IRCane.Channel do
   alias IRCane.Channel.Membership
   alias IRCane.Channel.State, as: ChannelState
+  alias IRCane.Channel.Topic
   alias IRCane.ChannelRegistry
   alias IRCane.Client
   alias IRCane.Protocol.Mode
