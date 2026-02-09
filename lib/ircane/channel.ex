@@ -1,4 +1,5 @@
 defmodule IRCane.Channel do
+  alias IRCane.Channel.Modes
   alias IRCane.Channel.Membership
   alias IRCane.Channel.State, as: ChannelState
   alias IRCane.Channel.Topic
@@ -140,8 +141,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :mode)
   end
 
-  @spec update_mode(String.t() | GenServer.server(), Client.t(), list({:add | :remove, Mode.t()})) ::
-          {:ok, {String.t(), [Mode.t()], [atom()]}} | {:error, term()}
+  @spec update_mode(String.t() | GenServer.server(), Client.t(), [Mode.mode_change()]) ::
+          {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
   def update_mode(channel_name, client, updates) when is_binary(channel_name) do
     update_mode(via_tuple(channel_name), client, updates)
   catch
@@ -201,7 +202,7 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_call({:privmsg, client, message}, _from, state) do
-    with :ok <- ChannelState.authorize(state, :speak, client) do
+    with :ok <- Modes.authorize(state, :speak, client) do
       {:reply, :ok, state, {:continue, {:notify_privmsg, client, message}}}
     else
       error ->
@@ -291,7 +292,7 @@ defmodule IRCane.Channel do
   end
 
   def handle_cast({:notice, client, message}, state) do
-    with :ok <- ChannelState.authorize(state, :speak, client) do
+    with :ok <- Modes.authorize(state, :speak, client) do
       do_broadcast(make_ref(), client, {:notice, client, state.name, message}, state)
     end
 
