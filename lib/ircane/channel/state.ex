@@ -35,12 +35,22 @@ defmodule IRCane.Channel.State do
     {:ok, %__MODULE__{name: name}}
   end
 
-  @spec join(t(), Client.t(), String.t() | nil) :: {:ok, t()} | :noop | {:error, atom()}
-  def join(channel_state, client, key \\ nil) do
+  @spec join(t(), Client.t(), reference(), String.t() | nil) ::
+          {:ok, t()} | :noop | {:error, atom()}
+  def join(channel_state, client, monitor_ref, key \\ nil) do
     if not is_member?(channel_state, client.pid) do
       with :ok <- Modes.authorize(channel_state, :join, client, key: key) do
         roles = if channel_state.new, do: [:operator], else: []
-        membership = %Membership{nickname: client.nickname, roles: roles}
+
+        membership =
+          %Membership{
+            nickname: client.nickname,
+            username: client.username,
+            hostname: client.hostname,
+            monitor_ref: monitor_ref,
+            roles: roles
+          }
+
         members = Map.put(channel_state.members, client.pid, membership)
 
         {:ok, %{channel_state | members: members, new: false}}
@@ -55,19 +65,20 @@ defmodule IRCane.Channel.State do
     {:ok, Map.values(channel_state.members)}
   end
 
-  @spec part(t(), Client.t()) :: {:ok, t()} | {:error, atom()}
+  @spec part(t(), Client.t()) :: {:ok, {t(), Membership.t()}} | {:error, atom()}
   def part(channel_state, client) do
     if is_member?(channel_state, client.pid) do
-      members = Map.delete(channel_state.members, client.pid)
-      {:ok, %{channel_state | members: members}}
+      {member, new_members} = Map.pop(channel_state.members, client.pid)
+      {:ok, {%{channel_state | members: new_members}, member}}
     else
       {:error, :not_on_channel}
     end
   end
 
-  @spec quit(t(), Client.t()) :: t()
-  def quit(channel_state, client) do
-    %{channel_state | members: Map.delete(channel_state.members, client.pid)}
+  @spec quit(t(), pid()) :: {t(), Membership.t() | nil}
+  def quit(channel_state, client_pid) do
+    {member, new_members} = Map.pop(channel_state.members, client_pid)
+    {%{channel_state | members: new_members}, member}
   end
 
   @spec topic(t(), Client.t()) :: {:ok, Topic.t()} | {:error, atom()}

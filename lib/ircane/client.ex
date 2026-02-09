@@ -21,7 +21,7 @@ defmodule IRCane.Client do
             away_message: nil,
             quit_message: nil,
             seen_events: :queue.new(),
-            joined_channels: MapSet.new()
+            joined_channels: %{}
 
   @type t :: any()
 
@@ -183,12 +183,26 @@ defmodule IRCane.Client do
   end
 
   @impl true
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
+    {channel_info, joined_channels} = Map.pop(state.joined_channels, pid)
+
+    if channel_info do
+      {:kick, :server, channel_info.name, state.nickname, "Internal Server Error"}
+      |> Replies.format_message(state.nickname)
+      |> Enum.each(&send_message(&1, state))
+
+      {:noreply, %{state | joined_channels: joined_channels}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl true
   def terminate(reason, state) do
     identifier = state.nickname || state.hostname || "unknown"
     quit_message = state.quit_message || "Internal Server Error"
-    quit_ref = make_ref()
 
-    Enum.each(state.joined_channels, &Channel.broadcast_quit(&1, quit_ref, state, quit_message))
+    Enum.each(state.joined_channels, &Channel.broadcast_quit(&1, state, quit_message))
 
     message =
       %Message{

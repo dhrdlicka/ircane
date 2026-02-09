@@ -34,9 +34,9 @@ defmodule IRCane.Channel do
     GenServer.cast(pid, {:broadcast_nick, ref, from, new_nickname})
   end
 
-  @spec broadcast_quit(GenServer.server(), reference(), Client.t(), String.t()) :: :ok
-  def broadcast_quit(pid, ref, from, quit_message) do
-    GenServer.cast(pid, {:broadcast_quit, ref, from, quit_message})
+  @spec broadcast_quit(GenServer.server(), Client.t(), String.t()) :: :ok
+  def broadcast_quit(pid, from, quit_message) do
+    GenServer.cast(pid, {:broadcast_quit, from, quit_message})
   end
 
   @spec join(String.t() | GenServer.server(), Client.t(), String.t() | nil) ::
@@ -174,7 +174,9 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_call({:join, client, key}, _from, state) do
-    case ChannelState.join(state, client, key) do
+    monitor_ref = Process.monitor(client.pid)
+
+    case ChannelState.join(state, client, monitor_ref, key) do
       {:ok, new_state} ->
         if state.new do
           Logger.notice("User #{client.nickname} created channel #{state.name}")
@@ -185,6 +187,7 @@ defmodule IRCane.Channel do
         {:reply, {:ok, self()}, new_state, {:continue, {:notify_join, client}}}
 
       other ->
+        Process.demonitor(monitor_ref)
         {:reply, other, state}
     end
   end
@@ -213,10 +216,12 @@ defmodule IRCane.Channel do
   @impl true
   def handle_call({:part, client, reason}, _from, state) do
     case ChannelState.part(state, client) do
-      {:ok, new_state} ->
+      {:ok, {new_state, membership}} ->
         Logger.info(
           "User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}"
         )
+
+        Process.demonitor(membership.monitor_ref)
 
         {:reply, {:ok, self()}, new_state, {:continue, {:notify_part, client, reason}}}
 
@@ -282,13 +287,13 @@ defmodule IRCane.Channel do
     {:noreply, ChannelState.update_member_nickname(state, client)}
   end
 
-  def handle_cast({:broadcast_quit, ref, client, quit_message}, state) do
+  def handle_cast({:broadcast_quit, client, quit_message}, state) do
     Logger.debug("Broadcasting quit in #{state.name}: #{client.nickname} (#{quit_message})")
-    do_broadcast(ref, client, {:quit, client, quit_message}, state)
+    do_broadcast({:quit, client.pid}, client, {:quit, client, quit_message}, state)
 
-    state
-    |> ChannelState.quit(client)
-    |> terminate_if_empty()
+    {new_state, member} = ChannelState.quit(state, client.pid)
+    Process.demonitor(member.monitor_ref)
+    terminate_if_empty(new_state)
   end
 
   def handle_cast({:notice, client, message}, state) do
@@ -327,6 +332,29 @@ defmodule IRCane.Channel do
   def handle_continue({:notify_privmsg, client, message}, state) do
     do_broadcast(make_ref(), client, {:privmsg, client, state.name, message}, state)
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, client_pid, _reason}, state) do
+    {new_state, member} = ChannelState.quit(state, client_pid)
+
+    if member do
+      quit_message = "Internal Server Error"
+
+      Logger.debug("Broadcasting quit in #{state.name}: #{member.nickname} (#{quit_message})")
+
+      client = %{
+        pid: client_pid,
+        nickname: member.nickname,
+        username: member.username,
+        hostname: member.hostname
+      }
+
+      do_broadcast({:quit, client_pid}, client, {:quit, client, quit_message}, state)
+      terminate_if_empty(new_state)
+    else
+      {:noreply, state}
+    end
   end
 
   defp do_broadcast(ref, from, message, state) do

@@ -28,7 +28,9 @@ defmodule IRCane.Commands.Part do
 
   defp part_channel(channel_name, state, reason) do
     with {:ok, channel_pid} <- Channel.part(channel_name, state, reason) do
-      new_state = %{state | joined_channels: MapSet.delete(state.joined_channels, channel_pid)}
+      {%{monitor_ref: ref}, joined_channels} = Map.pop(state.joined_channels, channel_pid)
+      Process.demonitor(ref)
+      new_state = %{state | joined_channels: joined_channels}
       {:ok, {:part, state, channel_name, reason}, new_state}
     end
   end

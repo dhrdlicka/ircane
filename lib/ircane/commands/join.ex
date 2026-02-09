@@ -34,7 +34,15 @@ defmodule IRCane.Commands.Join do
          {:ok, channel_pid} <- do_join(channel_name, key, state),
          {:ok, {channel_name, topic}} <- Channel.topic(channel_pid),
          {:ok, {_channel_name, names}} <- Channel.names(channel_pid) do
-      new_state = %{state | joined_channels: MapSet.put(state.joined_channels, channel_pid)}
+      channel_info = %{
+        name: channel_name,
+        monitor_ref: Process.monitor(channel_pid)
+      }
+
+      new_state = %{
+        state
+        | joined_channels: Map.put(state.joined_channels, channel_pid, channel_info)
+      }
 
       reply =
         if topic do
