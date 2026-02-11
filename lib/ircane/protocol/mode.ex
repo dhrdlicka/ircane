@@ -33,14 +33,14 @@ defmodule IRCane.Protocol.Mode do
         if opts[:list] do
           parse(modes_tail, args, known_modes, op, [{:list, name} | acc])
         else
-          parse(modes_tail, args, known_modes, op, [{op, {name, nil}} | acc])
+          parse(modes_tail, args, known_modes, op, [{:invalid, {:no_param, name}} | acc])
         end
 
       {op, %{^mode => {:param_always, name, _opts}}, [arg | args]} ->
         parse(modes_tail, args, known_modes, op, [{op, {name, arg}} | acc])
 
       {:add, %{^mode => {:param_when_set, name, _opts}}, []} ->
-        parse(modes_tail, args, known_modes, op, [{:add, {name, nil}} | acc])
+        parse(modes_tail, args, known_modes, op, [{:invalid, {:no_param, name}} | acc])
 
       {:add, %{^mode => {:param_when_set, name, _opts}}, [arg | args]} ->
         parse(modes_tail, args, known_modes, op, [{:add, {name, arg}} | acc])
