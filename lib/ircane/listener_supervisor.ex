@@ -7,9 +7,14 @@ defmodule IRCane.ListenerSupervisor do
 
   @impl true
   def init(_arg) do
-    children = [
-      {IRCane.Listener, 6667}
-    ]
+    children =
+      if Mix.env() != :test do
+        [
+          {IRCane.Listener, 6667}
+        ]
+      else
+        []
+      end
 
     Supervisor.init(children, strategy: :one_for_one)
   end
