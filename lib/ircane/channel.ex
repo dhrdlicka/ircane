@@ -339,7 +339,7 @@ defmodule IRCane.Channel do
     {new_state, member} = ChannelState.quit(state, client_pid)
 
     if member do
-      quit_message = "Internal Server Error"
+      quit_message = "User process terminated unexpectedly"
 
       Logger.debug("Broadcasting quit in #{state.name}: #{member.nickname} (#{quit_message})")
 

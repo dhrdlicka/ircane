@@ -187,7 +187,8 @@ defmodule IRCane.Client do
     {channel_info, joined_channels} = Map.pop(state.joined_channels, pid)
 
     if channel_info do
-      {:kick, :server, channel_info.name, state.nickname, "Internal Server Error"}
+      {:kick, :server, channel_info.name, state.nickname,
+       "Channel process terminated unexpectedly"}
       |> Replies.format_message(state.nickname)
       |> Enum.each(&send_message(&1, state))
 
@@ -200,7 +201,7 @@ defmodule IRCane.Client do
   @impl true
   def terminate(reason, state) do
     identifier = state.nickname || state.hostname || "unknown"
-    quit_message = state.quit_message || "Internal Server Error"
+    quit_message = state.quit_message || inspect(reason)
 
     Enum.each(state.joined_channels, &Channel.broadcast_quit(&1, state, quit_message))
 
