@@ -1,3 +1,5 @@
 %{
+  "ham": {:hex, :ham, "0.3.2", "02ae195f49970ef667faf9d01bc454fb80909a83d6c775bcac724ca567aeb7b3", [:mix], [], "hexpm", "b71cc684c0e5a3d32b5f94b186770551509e93a9ae44ca1c1a313700f2f6a69a"},
+  "mimic": {:hex, :mimic, "2.3.0", "88b1d13c285e57df6ea57204317bb56e49e7329668006cdcb80a9aafc73a9616", [:mix], [{:ham, "~> 0.3", [hex: :ham, repo: "hexpm", optional: false]}], "hexpm", "52771f23689398c5d41c7d05e91c2c28e10df273b784f40ca8b02e35e46850d3"},
   "ranch": {:hex, :ranch, "2.2.0", "25528f82bc8d7c6152c57666ca99ec716510fe0925cb188172f41ce93117b1b0", [:make, :rebar3], [], "hexpm", "fa0b99a1780c80218a4197a59ea8d3bdae32fbff7e88527d7d8a4787eff4f8e7"},
 }
