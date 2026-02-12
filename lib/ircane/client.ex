@@ -119,14 +119,14 @@ defmodule IRCane.Client do
 
   @impl true
   def handle_cast({:deliver, ref, _from, message}, state) do
-    if not :queue.member(ref, state.seen_events) do
+    if :queue.member(ref, state.seen_events) do
+      {:noreply, state}
+    else
       message
       |> Replies.format_message(state.nickname)
       |> Enum.each(&send_message(&1, state))
 
       {:noreply, %{state | seen_events: push_event(state.seen_events, ref)}}
-    else
-      {:noreply, state}
     end
   end
 
@@ -263,12 +263,13 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(line, state) do
-    with {:ok, %{command: command, params: params}} <- Message.parse(line) do
-      command
-      |> String.upcase()
-      |> handle_command(params, state)
-      |> register()
-    else
+    case Message.parse(line) do
+      {:ok, %{command: command, params: params}} ->
+        command
+        |> String.upcase()
+        |> handle_command(params, state)
+        |> register()
+
       {:error, reason} ->
         Logger.debug(
           "Failed to parse message from #{state.nickname || state.hostname || "unknown"}: #{inspect(reason)}"

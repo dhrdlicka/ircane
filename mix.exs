@@ -22,7 +22,8 @@ defmodule IRCane.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:mimic, "~> 2.3.0", only: :test}
+      {:mimic, "~> 2.3", only: :test},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end

@@ -8,7 +8,7 @@ defmodule IRCane.Commands.Notice do
     targets
     |> String.split(",")
     |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.map(&dispatch(&1, message, state))
+    |> Enum.each(&dispatch(&1, message, state))
 
     {:ok, state}
   end

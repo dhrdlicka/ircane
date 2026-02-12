@@ -66,18 +66,18 @@ defmodule IRCane.Channel.Modes do
       else: {:error, {:chan_o_privs_needed, channel_state.name}}
   end
 
-  defp is_banned?(%{modes: %{bans: bans}}, client) do
+  defp banned?(%{modes: %{bans: bans}}, client) do
     Enum.any?(bans, &BanMask.match?(&1, client))
   end
 
   defp enforce_ban_on_join(channel_state, client) do
-    if is_banned?(channel_state, client),
+    if banned?(channel_state, client),
       do: {:error, {:banned_from_chan, channel_state.name}},
       else: :ok
   end
 
   defp enforce_ban_on_speak(channel_state, client) do
-    if is_banned?(channel_state, client),
+    if banned?(channel_state, client),
       do: {:error, {:cannot_send_to_chan, channel_state.name}},
       else: :ok
   end
@@ -136,21 +136,22 @@ defmodule IRCane.Channel.Modes do
     result =
       Enum.reduce(updates, {channel_state, [], []}, fn
         update, {channel_state, applied_updates, errors} ->
-          with :ok <- authorize(channel_state, :update_mode, client, update: update) do
-            case do_apply(channel_state, update, client) do
-              {:ok, new_channel_state, applied_update} ->
-                {new_channel_state, [applied_update | applied_updates], errors}
+          case authorize(channel_state, :update_mode, client, update: update) do
+            :ok ->
+              case do_apply(channel_state, update, client) do
+                {:ok, new_channel_state, applied_update} ->
+                  {new_channel_state, [applied_update | applied_updates], errors}
 
-              {:ok, new_channel_state} ->
-                {new_channel_state, [update | applied_updates], errors}
+                {:ok, new_channel_state} ->
+                  {new_channel_state, [update | applied_updates], errors}
 
-              {:error, error} ->
-                {channel_state, applied_updates, [error | errors]}
+                {:error, error} ->
+                  {channel_state, applied_updates, [error | errors]}
 
-              _ ->
-                {channel_state, applied_updates, errors}
-            end
-          else
+                _ ->
+                  {channel_state, applied_updates, errors}
+              end
+
             {:error, error} ->
               {channel_state, applied_updates, [error | errors]}
           end
@@ -208,11 +209,11 @@ defmodule IRCane.Channel.Modes do
   end
 
   defp do_apply(%{modes: %{bans: bans}} = channel_state, {:add, {:ban, ban_mask}}, _client) do
-    if not MapSet.member?(bans, ban_mask) do
+    if MapSet.member?(bans, ban_mask) do
+      :noop
+    else
       new_bans = MapSet.put(bans, ban_mask)
       {:ok, %{channel_state | modes: Map.put(channel_state.modes, :bans, new_bans)}}
-    else
-      :noop
     end
   end
 

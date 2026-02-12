@@ -205,9 +205,10 @@ defmodule IRCane.Channel do
 
   @impl true
   def handle_call({:privmsg, client, message}, _from, state) do
-    with :ok <- Modes.authorize(state, :speak, client) do
-      {:reply, :ok, state, {:continue, {:notify_privmsg, client, message}}}
-    else
+    case Modes.authorize(state, :speak, client) do
+      :ok ->
+        {:reply, :ok, state, {:continue, {:notify_privmsg, client, message}}}
+
       error ->
         {:reply, error, state}
     end

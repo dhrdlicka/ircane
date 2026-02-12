@@ -38,7 +38,9 @@ defmodule IRCane.Channel.State do
   @spec join(t(), Client.t(), reference(), String.t() | nil) ::
           {:ok, t()} | :noop | {:error, atom()}
   def join(channel_state, client, monitor_ref, key \\ nil) do
-    if not is_member?(channel_state, client.pid) do
+    if member?(channel_state, client.pid) do
+      :noop
+    else
       with :ok <- Modes.authorize(channel_state, :join, client, key: key) do
         roles = if channel_state.new, do: [:operator], else: []
 
@@ -55,8 +57,6 @@ defmodule IRCane.Channel.State do
 
         {:ok, %{channel_state | members: members, new: false}}
       end
-    else
-      :noop
     end
   end
 
@@ -67,7 +67,7 @@ defmodule IRCane.Channel.State do
 
   @spec part(t(), Client.t()) :: {:ok, {t(), Membership.t()}} | {:error, atom()}
   def part(channel_state, client) do
-    if is_member?(channel_state, client.pid) do
+    if member?(channel_state, client.pid) do
       {member, new_members} = Map.pop(channel_state.members, client.pid)
       {:ok, {%{channel_state | members: new_members}, member}}
     else
@@ -134,12 +134,12 @@ defmodule IRCane.Channel.State do
     )
   end
 
-  @spec is_member?(t(), pid() | String.t()) :: boolean()
-  def is_member?(channel_state, client_pid) when is_pid(client_pid) do
+  @spec member?(t(), pid() | String.t()) :: boolean()
+  def member?(channel_state, client_pid) when is_pid(client_pid) do
     Map.has_key?(channel_state.members, client_pid)
   end
 
-  def is_member?(channel_state, nickname) when is_binary(nickname) do
+  def member?(channel_state, nickname) when is_binary(nickname) do
     downcased = String.downcase(nickname)
 
     Enum.any?(channel_state.members, fn

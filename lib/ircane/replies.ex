@@ -339,12 +339,11 @@ defmodule IRCane.Replies do
   def format_message({:names, channel, members}, client) do
     member_list =
       members
-      |> Enum.map(fn
+      |> Enum.map_join(" ", fn
         %{nickname: nickname, roles: roles} ->
           prefix = roles |> Role.max() |> Role.prefix()
           prefix <> nickname
       end)
-      |> Enum.join(" ")
 
     [
       {:names_reply, channel, member_list},

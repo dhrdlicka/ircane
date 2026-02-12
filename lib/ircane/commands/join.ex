@@ -90,14 +90,15 @@ defmodule IRCane.Commands.Join do
   end
 
   defp do_join(channel_name, key, state, attempts) do
-    with {:ok, pid} <- Channel.join(channel_name, state, key) do
-      {:ok, pid}
-    else
+    case Channel.join(channel_name, state, key) do
+      {:ok, pid} ->
+        {:ok, pid}
+
       {:error, {:no_such_channel, _channel_name}} ->
-        with {:ok, pid} <-
-               DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
-          Channel.join(pid, state, key)
-        else
+        case DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
+          {:ok, pid} ->
+            Channel.join(pid, state, key)
+
           {:error, {:already_started, _pid}} ->
             do_join(channel_name, key, state, attempts - 1)
 
