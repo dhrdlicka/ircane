@@ -179,7 +179,9 @@ defmodule IRCane.Channel.StateTest do
       refute Map.has_key?(new_state.members, client.pid)
     end
 
-    test "returns unchanged state and nil member if the client was not on the channel", %{client: client} do
+    test "returns unchanged state and nil member if the client was not on the channel", %{
+      client: client
+    } do
       {:ok, state} = ChannelState.create("#test")
 
       assert {^state, nil} = ChannelState.quit(state, client.pid)
