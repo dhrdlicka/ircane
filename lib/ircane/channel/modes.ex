@@ -55,7 +55,7 @@ defmodule IRCane.Channel.Modes do
   end
 
   defp ensure_member(channel_state, client_pid) do
-    if ChannelState.is_member?(channel_state, client_pid),
+    if ChannelState.member?(channel_state, client_pid),
       do: :ok,
       else: {:error, {:not_on_channel, channel_state.name}}
   end
