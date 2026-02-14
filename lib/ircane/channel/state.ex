@@ -96,9 +96,12 @@ defmodule IRCane.Channel.State do
 
   @spec update_member_nickname(t(), Client.t()) :: t()
   def update_member_nickname(channel_state, client) do
-    membership = channel_state.members[client.pid]
-    members = %{channel_state.members | client.pid => %{membership | nickname: client.nickname}}
-    %{channel_state | members: members}
+    if member?(channel_state, client.pid) do
+      members = Map.update!(channel_state.members, client.pid, &%{&1 | nickname: client.nickname})
+      %{channel_state | members: members}
+    else
+      channel_state
+    end
   end
 
   @spec mode(t(), Client.t()) :: {:ok, [Mode.t()]} | {:error, atom()}
