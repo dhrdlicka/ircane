@@ -25,7 +25,10 @@ defmodule IRCane.Commands.Nick do
           Logger.notice("User changed nickname: #{state.nickname} -> #{new_nickname}")
 
           ref = make_ref()
-          Enum.each(state.joined_channels, &Channel.broadcast_nick(&1, ref, state, new_nickname))
+
+          state.joined_channels
+          |> Map.keys()
+          |> Enum.each(&Channel.broadcast_nick(&1, ref, state, new_nickname))
 
           new_state = %{state | nickname: new_nickname}
           {:ok, {:nick, state, new_nickname}, new_state}

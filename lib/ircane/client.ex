@@ -203,7 +203,9 @@ defmodule IRCane.Client do
     identifier = state.nickname || state.hostname || "unknown"
     quit_message = state.quit_message || inspect(reason)
 
-    Enum.each(state.joined_channels, &Channel.broadcast_quit(&1, state, quit_message))
+    state.joined_channels
+    |> Map.keys()
+    |> Enum.each(&Channel.broadcast_quit(&1, state, quit_message))
 
     message =
       %Message{
