@@ -201,7 +201,7 @@ defmodule IRCane.Client do
   @impl true
   def terminate(reason, state) do
     identifier = state.nickname || state.hostname || "unknown"
-    quit_message = state.quit_message || inspect(reason)
+    quit_message = state.quit_message || "User process terminated unexpectedly"
 
     state.joined_channels
     |> Map.keys()
