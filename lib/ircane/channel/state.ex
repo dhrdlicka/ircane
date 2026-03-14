@@ -110,8 +110,8 @@ defmodule IRCane.Channel.State do
     {:ok, modes}
   end
 
-  @spec update_mode(t(), Client.t(), list({:add | :remove, Mode.t()})) ::
-          {:ok, {t(), list({:add | :remove, Mode.t()}), list(atom())}} | {:error, atom()}
+  @spec update_mode(t(), Client.t(), [Mode.mode_change()]) ::
+          {:ok, {t(), [Mode.mode_change()], [atom()]}} | {:error, atom()}
   def update_mode(channel_state, client, mode_updates) do
     Modes.apply(channel_state, mode_updates, client)
   end
