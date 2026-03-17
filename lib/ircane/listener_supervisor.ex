@@ -10,7 +10,8 @@ defmodule IRCane.ListenerSupervisor do
     children =
       if Mix.env() != :test do
         [
-          {IRCane.Listener, 6667}
+          {IRCane.Listener, 6667},
+          {ThousandIsland, handler_module: IRCane.Transport.TCP, port: 6668}
         ]
       else
         []

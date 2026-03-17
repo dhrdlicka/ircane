@@ -22,8 +22,9 @@ defmodule IRCane.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mimic, "~> 2.3", only: :test},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:thousand_island, "~> 1.4"}
     ]
   end
 end

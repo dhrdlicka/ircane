@@ -3,6 +3,7 @@ defmodule IRCane.Client do
   alias IRCane.Protocol.Message
   alias IRCane.UserRegistry
   alias IRCane.Replies
+  alias IRCane.Transport
 
   require Logger
 
@@ -92,6 +93,14 @@ defmodule IRCane.Client do
     GenServer.cast(pid, {:notice, client, message})
   end
 
+  def process_messages(pid, messages) do
+    GenServer.cast(pid, {:process_messages, messages})
+  end
+
+  def transport_error(pid, reason) do
+    GenServer.cast(pid, {:transport_error, reason})
+  end
+
   @impl true
   def init(socket) do
     {:ok, %__MODULE__{socket: socket, pid: self()}, {:continue, :init}}
@@ -137,6 +146,22 @@ defmodule IRCane.Client do
     |> Enum.each(&send_message(&1, state))
 
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:process_messages, messages}, state) do
+    {:noreply, Enum.reduce(messages, state, &handle_line/2)}
+  end
+
+  @impl true
+  def handle_cast({:transport_error, reason}, state) do
+    {:noreply, %{state | disconnecting?: true, quit_message: inspect(reason)}}
+  end
+
+  @impl true
+  def handle_continue(:init, state) when is_pid(state.socket) do
+    %{hostname: hostname} = Transport.TCP.finish_handshake(state.socket)
+    {:noreply, %{state | hostname: hostname}}
   end
 
   @impl true
@@ -214,7 +239,10 @@ defmodule IRCane.Client do
       }
 
     send_message(message, state)
-    :gen_tcp.close(state.socket)
+
+    if is_port(state.socket) do
+      :gen_tcp.close(state.socket)
+    end
 
     case reason do
       :normal ->
@@ -339,6 +367,17 @@ defmodule IRCane.Client do
 
   defp register(state) do
     state
+  end
+
+  defp send_message(%Message{} = message, state) when is_pid(state.socket) do
+    raw_message = Message.build(message) <> "\r\n"
+    Transport.TCP.send_message(state.socket, raw_message)
+
+    Logger.debug(
+      "[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}"
+    )
+
+    :ok
   end
 
   defp send_message(%Message{} = message, state) do
