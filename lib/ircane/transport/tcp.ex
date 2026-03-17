@@ -42,7 +42,7 @@ defmodule IRCane.Transport.TCP do
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
-    {:ok, client_pid} = DynamicSupervisor.start_child(ClientSupervisor, {Client, self()})
+    {:ok, client_pid} = DynamicSupervisor.start_child(ClientSupervisor, {Client, {__MODULE__, self()}})
 
     hostname =
       case ThousandIsland.Socket.peername(socket) do

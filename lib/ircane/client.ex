@@ -3,13 +3,12 @@ defmodule IRCane.Client do
   alias IRCane.Protocol.Message
   alias IRCane.UserRegistry
   alias IRCane.Replies
-  alias IRCane.Transport
 
   require Logger
 
   use GenServer, restart: :temporary
 
-  defstruct socket: nil,
+  defstruct transport: nil,
             buffer: "",
             pid: nil,
             nickname: nil,
@@ -27,7 +26,6 @@ defmodule IRCane.Client do
   @type t :: any()
 
   @event_dedup_size 1_000
-  @max_buffer 8_192
   @max_line 510
   @command_handlers %{
     "NICK" => IRCane.Commands.Nick,
@@ -46,9 +44,9 @@ defmodule IRCane.Client do
   }
   @unregistered_commands ["NICK", "USER"]
 
-  @spec start_link(socket :: :inet.socket()) :: GenServer.on_start()
-  def start_link(socket) do
-    GenServer.start_link(__MODULE__, socket)
+  @spec start_link(transport :: {module(), any()}) :: GenServer.on_start()
+  def start_link(transport) do
+    GenServer.start_link(__MODULE__, transport)
   end
 
   def state(nickname) when is_binary(nickname) do
@@ -60,11 +58,6 @@ defmodule IRCane.Client do
 
   def state(pid) do
     GenServer.call(pid, :state)
-  end
-
-  @spec socket_ready(pid :: pid()) :: :ok
-  def socket_ready(pid) do
-    GenServer.cast(pid, :socket_ready)
   end
 
   def deliver(pid, ref, from, message) do
@@ -102,8 +95,8 @@ defmodule IRCane.Client do
   end
 
   @impl true
-  def init(socket) do
-    {:ok, %__MODULE__{socket: socket, pid: self()}, {:continue, :init}}
+  def init(transport) do
+    {:ok, %__MODULE__{transport: transport, pid: self()}, {:continue, :init}}
   end
 
   @impl true
@@ -118,12 +111,6 @@ defmodule IRCane.Client do
     |> Enum.each(&send_message(&1, state))
 
     {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_cast(:socket_ready, state) do
-    :inet.setopts(state.socket, active: :once)
-    {:noreply, state}
   end
 
   @impl true
@@ -159,52 +146,9 @@ defmodule IRCane.Client do
   end
 
   @impl true
-  def handle_continue(:init, state) when is_pid(state.socket) do
-    %{hostname: hostname} = Transport.TCP.finish_handshake(state.socket)
+  def handle_continue(:init, %{transport: {mod, ref}} = state) do
+    %{hostname: hostname} = mod.finish_handshake(ref)
     {:noreply, %{state | hostname: hostname}}
-  end
-
-  @impl true
-  def handle_continue(:init, state) do
-    with {:ok, {ipv4, _port}} <- :inet.peername(state.socket) do
-      hostname =
-        ipv4
-        |> :inet_parse.ntoa()
-        |> to_string()
-
-      Logger.debug("Client connection initialized from #{hostname}")
-
-      {:noreply, %{state | hostname: hostname}}
-    end
-  end
-
-  @impl true
-  def handle_info({:tcp, socket, packet}, state) do
-    Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] Received: #{String.trim(packet)}"
-    )
-
-    state = handle_packet(packet, state)
-
-    :inet.setopts(socket, active: :once)
-
-    if state.disconnecting? do
-      {:stop, :normal, state}
-    else
-      {:noreply, state}
-    end
-  end
-
-  @impl true
-  def handle_info({:tcp_closed, _socket}, state) do
-    Logger.debug("Socket closed for #{state.nickname || state.hostname || "unknown"}")
-    {:stop, :normal, state}
-  end
-
-  @impl true
-  def handle_info({:tcp_error, _socket, reason}, state) do
-    Logger.error("TCP error: #{inspect(reason)}")
-    {:stop, :normal, state}
   end
 
   @impl true
@@ -240,10 +184,6 @@ defmodule IRCane.Client do
 
     send_message(message, state)
 
-    if is_port(state.socket) do
-      :gen_tcp.close(state.socket)
-    end
-
     case reason do
       :normal ->
         Logger.debug("Client #{identifier} disconnected normally")
@@ -257,33 +197,6 @@ defmodule IRCane.Client do
     {:via, Registry, {UserRegistry, String.downcase(nickname)}}
   end
 
-  defp handle_packet(packet, state) do
-    buffer = state.buffer <> packet
-
-    if byte_size(buffer) > @max_buffer do
-      Logger.warning(
-        "Buffer overflow for client #{state.nickname || state.hostname || "unknown"}: #{byte_size(buffer)} bytes"
-      )
-
-      %{state | disconnecting?: true, quit_message: "Buffer overflow"}
-    else
-      {lines, rest} = split_lines(buffer)
-      Enum.reduce(lines, %{state | buffer: rest}, &handle_line/2)
-    end
-  end
-
-  defp split_lines(buffer) do
-    {rest, lines} =
-      buffer
-      |> :binary.split("\n", [:global])
-      |> List.pop_at(-1)
-
-    lines =
-      Enum.map(lines, fn line -> String.trim_trailing(line, "\r") end)
-
-    {lines, rest}
-  end
-
   defp handle_line(line, state) when byte_size(line) > @max_line do
     Logger.warning(
       "Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes"
@@ -293,6 +206,10 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(line, state) do
+    Logger.debug(
+      "[#{state.nickname || state.hostname || "unknown"}] Received: #{String.trim(line)}"
+    )
+
     case Message.parse(line) do
       {:ok, %{command: command, params: params}} ->
         command
@@ -369,20 +286,9 @@ defmodule IRCane.Client do
     state
   end
 
-  defp send_message(%Message{} = message, state) when is_pid(state.socket) do
+  defp send_message(%Message{} = message, %{transport: {mod, ref}} = state) do
     raw_message = Message.build(message) <> "\r\n"
-    Transport.TCP.send_message(state.socket, raw_message)
-
-    Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}"
-    )
-
-    :ok
-  end
-
-  defp send_message(%Message{} = message, state) do
-    raw_message = Message.build(message) <> "\r\n"
-    :gen_tcp.send(state.socket, raw_message)
+    mod.send_message(ref, raw_message)
 
     Logger.debug(
       "[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}"
