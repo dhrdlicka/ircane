@@ -3,6 +3,7 @@ defmodule IRCane.Client do
   alias IRCane.Protocol.Message
   alias IRCane.UserRegistry
   alias IRCane.Replies
+  alias IRCane.Utils.ReverseDNSResolver
 
   require Logger
 
@@ -148,7 +149,16 @@ defmodule IRCane.Client do
   @impl true
   def handle_continue(:init, %{transport: {mod, ref}} = state) do
     %{hostname: hostname} = mod.finish_handshake(ref)
-    {:noreply, %{state | hostname: hostname}}
+
+    case ReverseDNSResolver.resolve(hostname) do
+      {:ok, resolved_hostname} ->
+        Logger.debug("Reverse DNS lookup successful for #{hostname}: #{resolved_hostname}")
+        {:noreply, %{state | hostname: resolved_hostname}}
+
+      {:error, reason} ->
+        Logger.warning("Reverse DNS lookup failed for #{hostname}: #{inspect(reason)}")
+        {:noreply, %{state | hostname: hostname}}
+    end
   end
 
   @impl true
