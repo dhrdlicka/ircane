@@ -226,16 +226,14 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(line, state) do
-    Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] << #{String.trim(line)}"
-    )
+    Logger.debug("[#{state.nickname || state.hostname || "unknown"}] << #{String.trim(line)}")
 
     case Message.parse(line) do
       {:ok, %{command: command, params: params}} ->
         command
         |> String.upcase()
         |> handle_command(params, state)
-        |> register()
+        |> maybe_register()
 
       {:error, reason} ->
         Logger.debug(
@@ -286,7 +284,9 @@ defmodule IRCane.Client do
     end
   end
 
-  defp register(%{registered?: false, nickname: nick, username: user} = state)
+  defp cmd(state, command, params), do: handle_command(command, params, state)
+
+  defp maybe_register(%{registered?: false, nickname: nick, username: user} = state)
        when not is_nil(nick) and not is_nil(user) do
     Logger.notice("User registered: #{state.nickname}!#{state.username}@#{state.hostname}")
 
@@ -294,15 +294,12 @@ defmodule IRCane.Client do
     |> Replies.format_message(state.nickname)
     |> Enum.each(&send_message(&1, state))
 
-    state = %{state | registered?: true}
-
-    handle_command("LUSERS", [], state)
-    handle_command("MOTD", [], state)
-
-    state
+    %{state | registered?: true}
+    |> cmd("LUSERS", [])
+    |> cmd("MOTD", [])
   end
 
-  defp register(state) do
+  defp maybe_register(state) do
     state
   end
 
