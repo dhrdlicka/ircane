@@ -219,7 +219,7 @@ defmodule IRCane.Client do
 
   defp handle_line(line, state) do
     Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] Received: #{String.trim(line)}"
+      "[#{state.nickname || state.hostname || "unknown"}] << #{String.trim(line)}"
     )
 
     case Message.parse(line) do
@@ -303,7 +303,7 @@ defmodule IRCane.Client do
     mod.send_message(ref, raw_message)
 
     Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] Sent: #{String.trim(raw_message)}"
+      "[#{state.nickname || state.hostname || "unknown"}] >> #{String.trim(raw_message)}"
     )
 
     :ok

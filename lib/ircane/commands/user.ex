@@ -5,8 +5,9 @@ defmodule IRCane.Commands.User do
     {:error, :already_registered}
   end
 
-  def handle([username, _, _, realname | _], state) do
+  def handle([username, _, _, realname | _], %{transport: {mod, ref}} = state) do
     Logger.debug("User set username: #{username}, realname: #{realname}")
+    mod.update_user_info(ref, username: username)
     {:ok, %{state | username: username, realname: realname}}
   end
 

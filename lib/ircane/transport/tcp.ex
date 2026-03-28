@@ -5,6 +5,7 @@ defmodule IRCane.Transport.TCP do
 
   alias IRCane.Client
   alias IRCane.ClientSupervisor
+  alias IRCane.Replies
 
   @max_buffer_size 8_192
 
@@ -14,6 +15,10 @@ defmodule IRCane.Transport.TCP do
 
   def send_message(pid, message) do
     GenServer.cast(pid, {:send_message, message})
+  end
+
+  def update_user_info(pid, user_info) do
+    GenServer.cast(pid, {:update_user_info, user_info})
   end
 
   @impl GenServer
@@ -34,15 +39,24 @@ defmodule IRCane.Transport.TCP do
     end
   end
 
+  def handle_cast({:update_user_info, user_info}, {socket, state}) do
+    {:noreply, {socket, %{state | username: user_info[:username]}}}
+  end
+
   @impl GenServer
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, {socket, state}) when pid == state.client_pid do
-    Logger.debug("Client process #{inspect(pid)} has terminated, closing socket for #{state.hostname}")
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, {socket, state})
+      when pid == state.client_pid do
+    Logger.debug(
+      "Client process #{inspect(pid)} has terminated, closing socket for #{state.hostname}"
+    )
+
     {:stop, {:shutdown, :local_closed}, {socket, state}}
   end
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
-    {:ok, client_pid} = DynamicSupervisor.start_child(ClientSupervisor, {Client, {__MODULE__, self()}})
+    {:ok, client_pid} =
+      DynamicSupervisor.start_child(ClientSupervisor, {Client, {__MODULE__, self()}})
 
     hostname =
       case ThousandIsland.Socket.peername(socket) do
@@ -59,11 +73,12 @@ defmodule IRCane.Transport.TCP do
     Process.monitor(client_pid)
 
     {:continue,
-      %{
-        client_pid: client_pid,
-        hostname: hostname,
-        buffer: ""
-      }}
+     %{
+       client_pid: client_pid,
+       username: nil,
+       hostname: hostname,
+       buffer: ""
+     }}
   end
 
   @impl ThousandIsland.Handler
@@ -84,6 +99,9 @@ defmodule IRCane.Transport.TCP do
 
       _ ->
         Client.transport_error(state.client_pid, :buffer_overflow)
+
+        send_error(state, "Input buffer overflow")
+
         {:close, state}
     end
   end
@@ -98,5 +116,13 @@ defmodule IRCane.Transport.TCP do
   def handle_error(reason, _socket, state) do
     Logger.error("TCP error for #{state.hostname}: #{inspect(reason)}")
     Client.transport_error(state.client_pid, reason)
+  end
+
+  defp send_error(state, reason) do
+    mask = "#{inspect(state.username)}@#{state.hostname}"
+
+    {:error, "Closing link: (#{mask}) [#{reason}]"}
+    |> Replies.format_message(state.nickname || "*")
+    |> Enum.each(&ThousandIsland.Socket.send(state.socket, &1))
   end
 end
