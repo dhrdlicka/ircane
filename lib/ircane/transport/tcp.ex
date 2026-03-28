@@ -119,7 +119,7 @@ defmodule IRCane.Transport.TCP do
   end
 
   defp send_error(state, reason) do
-    mask = "#{inspect(state.username)}@#{state.hostname}"
+    mask = "#{state.username || "unknown"}@#{state.hostname}"
 
     {:error, "Closing link: (#{mask}) [#{reason}]"}
     |> Replies.format_message()

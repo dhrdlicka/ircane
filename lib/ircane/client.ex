@@ -192,7 +192,7 @@ defmodule IRCane.Client do
     |> Map.keys()
     |> Enum.each(&Channel.broadcast_quit(&1, state, message))
 
-    mask = "#{inspect(state.username)}@#{state.hostname}"
+    mask = "#{state.username || "unknown"}@#{state.hostname}"
 
     {:error, "Closing link: (#{mask}) [#{message}]"}
     |> Replies.format_message(state.nickname)
