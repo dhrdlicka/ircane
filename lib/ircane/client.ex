@@ -211,6 +211,8 @@ defmodule IRCane.Client do
     {:via, Registry, {UserRegistry, String.downcase(nickname)}}
   end
 
+  defp handle_line(_line, %{disconnecting?: true} = state), do: state
+
   defp handle_line(line, state) when byte_size(line) > @max_line do
     :input_too_long
     |> Replies.format_message(state.nickname)
