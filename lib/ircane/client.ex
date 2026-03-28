@@ -138,12 +138,18 @@ defmodule IRCane.Client do
 
   @impl true
   def handle_cast({:process_messages, messages}, state) do
-    {:noreply, Enum.reduce(messages, state, &handle_line/2)}
+    new_state = Enum.reduce(messages, state, &handle_line/2)
+
+    if state.disconnecting? do
+      {:stop, :normal, new_state}
+    else
+      {:noreply, new_state}
+    end
   end
 
   @impl true
   def handle_cast({:transport_error, reason}, state) do
-    {:noreply, %{state | disconnecting?: true, quit_message: inspect(reason)}}
+    {:stop, :normal, %{state | disconnecting?: true, quit_message: inspect(reason)}}
   end
 
   @impl true
