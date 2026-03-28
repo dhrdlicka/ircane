@@ -195,7 +195,7 @@ defmodule IRCane.Client do
     mask = "#{inspect(state.username)}@#{state.hostname}"
 
     {:error, "Closing link: (#{mask}) [#{message}]"}
-    |> Replies.format_message(state.nickname || "*")
+    |> Replies.format_message(state.nickname)
     |> Enum.each(&send_message(&1, state))
 
     case reason do
@@ -213,7 +213,7 @@ defmodule IRCane.Client do
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
     :input_too_long
-    |> Replies.format_message(state.nickname || "*")
+    |> Replies.format_message(state.nickname)
     |> Enum.each(&send_message(&1, state))
 
     Logger.warning(
@@ -251,14 +251,14 @@ defmodule IRCane.Client do
 
       {:ok, result, new_state} ->
         result
-        |> Replies.format_message(new_state.nickname || "*")
+        |> Replies.format_message(new_state.nickname)
         |> Enum.each(&send_message(&1, new_state))
 
         new_state
 
       {:error, error} ->
         error
-        |> Replies.format_message(state.nickname || "*")
+        |> Replies.format_message(state.nickname)
         |> Enum.each(&send_message(&1, state))
 
         state

@@ -11,6 +11,8 @@ defmodule IRCane.Replies do
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   defp format_numeric(reply, client) do
+    client = client || "*"
+
     case reply do
       :welcome ->
         %Message{
@@ -296,6 +298,8 @@ defmodule IRCane.Replies do
     end)
     |> List.flatten()
   end
+
+  def format_message(message, client \\ nil)
 
   def format_message(messages, client) when is_list(messages) do
     messages
