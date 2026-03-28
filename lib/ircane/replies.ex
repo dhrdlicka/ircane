@@ -174,6 +174,13 @@ defmodule IRCane.Replies do
           params: [client, channel, "Cannot send to channel"]
         }
 
+      :input_too_long ->
+        %Message{
+          source: @server_name,
+          command: "417",
+          params: [client, "Input line was too long"]
+        }
+
       {:unknown_command, command} ->
         %Message{
           source: @server_name,

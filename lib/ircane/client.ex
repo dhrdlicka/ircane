@@ -208,6 +208,10 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
+    :input_too_long
+    |> Replies.format_message(state.nickname || "*")
+    |> Enum.each(&send_message(&1, state))
+
     Logger.warning(
       "Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes"
     )
