@@ -140,7 +140,7 @@ defmodule IRCane.Client do
   def handle_cast({:process_messages, messages}, state) do
     new_state = Enum.reduce(messages, state, &handle_line/2)
 
-    if state.disconnecting? do
+    if new_state.disconnecting? do
       {:stop, :normal, new_state}
     else
       {:noreply, new_state}
