@@ -394,7 +394,7 @@ defmodule IRCane.Replies do
   end
 
   def format_message({:error, reason}, _client) do
-    [%Message{source: @server_name, command: "ERROR", params: [reason]}]
+    [%Message{command: "ERROR", params: [reason]}]
   end
 
   def format_message(other, client) do
