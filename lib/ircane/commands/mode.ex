@@ -11,10 +11,7 @@ defmodule IRCane.Commands.Mode do
   end
 
   def handle(["#" <> _ = target | params], state) do
-    modes =
-      params
-      |> Mode.parse(@channel_modes)
-      |> Mode.parse_params(@channel_modes)
+    modes = Mode.parse(params, @channel_modes)
 
     {mode_changes, lists, invalid} =
       Enum.reduce(modes, {[], [], []}, fn

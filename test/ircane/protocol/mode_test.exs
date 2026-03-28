@@ -3,53 +3,53 @@ defmodule IRCane.Protocol.ModeTest do
 
   alias IRCane.Protocol.Mode
 
-  describe "parse/2" do
+  describe "parse_modes/2" do
     test "handles applying param_always mode with no param" do
       modes = %{?T => {:param_always, :test, []}}
 
-      assert [{:invalid, {:no_param, :test}}] = Mode.parse(["+T"], modes)
+      assert [{:invalid, {:no_param, :test}}] = Mode.parse_modes(["+T"], modes)
     end
 
     test "handles applying list mode with no param" do
       modes = %{?T => {:param_always, :test, list: true}}
 
-      assert [{:list, :test}] = Mode.parse(["+T"], modes)
+      assert [{:list, :test}] = Mode.parse_modes(["+T"], modes)
     end
 
     test "handles applying param_always mode with a param" do
       modes = %{?T => {:param_always, :test, []}}
 
-      assert [{:add, {:test, "param"}}] = Mode.parse(["+T", "param"], modes)
+      assert [{:add, {:test, "param"}}] = Mode.parse_modes(["+T", "param"], modes)
     end
 
     test "handles removing param_always mode with no param" do
       modes = %{?T => {:param_always, :test, []}}
 
-      assert [{:invalid, {:no_param, :test}}] = Mode.parse(["-T"], modes)
+      assert [{:invalid, {:no_param, :test}}] = Mode.parse_modes(["-T"], modes)
     end
 
     test "handles removing param_always mode with a param" do
       modes = %{?T => {:param_always, :test, []}}
 
-      assert [{:remove, {:test, "param"}}] = Mode.parse(["-T", "param"], modes)
+      assert [{:remove, {:test, "param"}}] = Mode.parse_modes(["-T", "param"], modes)
     end
 
     test "handles applying param_when_set mode with no param" do
       modes = %{?T => {:param_when_set, :test, []}}
 
-      assert [{:invalid, {:no_param, :test}}] = Mode.parse(["+T"], modes)
+      assert [{:invalid, {:no_param, :test}}] = Mode.parse_modes(["+T"], modes)
     end
 
     test "handles applying param_when_set mode with a param" do
       modes = %{?T => {:param_when_set, :test, []}}
 
-      assert [{:add, {:test, "param"}}] = Mode.parse(["+T", "param"], modes)
+      assert [{:add, {:test, "param"}}] = Mode.parse_modes(["+T", "param"], modes)
     end
 
     test "handles removing param_when_set mode with no param" do
       modes = %{?T => {:param_when_set, :test, []}}
 
-      assert [{:remove, :test}] = Mode.parse(["-T"], modes)
+      assert [{:remove, :test}] = Mode.parse_modes(["-T"], modes)
     end
 
     test "does not consume param when removing param_when_set mode" do
@@ -59,13 +59,13 @@ defmodule IRCane.Protocol.ModeTest do
       }
 
       assert [{:remove, :test}, {:remove, {:other, "param"}}] =
-               Mode.parse(["-TU", "param"], modes)
+               Mode.parse_modes(["-TU", "param"], modes)
     end
 
     test "handles applying no_param mode with no param" do
       modes = %{?T => {:no_param, :test, []}}
 
-      assert [{:add, :test}] = Mode.parse(["+T"], modes)
+      assert [{:add, :test}] = Mode.parse_modes(["+T"], modes)
     end
 
     test "does not consume param when applying no_param mode" do
@@ -74,13 +74,14 @@ defmodule IRCane.Protocol.ModeTest do
         ?U => {:param_always, :other, []}
       }
 
-      assert [{:add, :test}, {:add, {:other, "param"}}] = Mode.parse(["+TU", "param"], modes)
+      assert [{:add, :test}, {:add, {:other, "param"}}] =
+               Mode.parse_modes(["+TU", "param"], modes)
     end
 
     test "handles removing no_param mode with no param" do
       modes = %{?T => {:no_param, :test, []}}
 
-      assert [{:remove, :test}] = Mode.parse(["-T"], modes)
+      assert [{:remove, :test}] = Mode.parse_modes(["-T"], modes)
     end
 
     test "does not consume param when removing no_param mode" do
@@ -90,7 +91,7 @@ defmodule IRCane.Protocol.ModeTest do
       }
 
       assert [{:remove, :test}, {:remove, {:other, "param"}}] =
-               Mode.parse(["-TU", "param"], modes)
+               Mode.parse_modes(["-TU", "param"], modes)
     end
 
     test "preserves mode and param order" do
@@ -106,7 +107,7 @@ defmodule IRCane.Protocol.ModeTest do
                {:add, {:mode_b, "bar"}},
                {:add, {:mode_c, "baz"}},
                {:add, :mode_d}
-             ] = Mode.parse(["+abcd", "foo", "bar", "baz"], modes)
+             ] = Mode.parse_modes(["+abcd", "foo", "bar", "baz"], modes)
     end
 
     test "handles plus and minus signs in the middle of a mode string" do
@@ -119,31 +120,65 @@ defmodule IRCane.Protocol.ModeTest do
                {:remove, :test},
                {:add, :test},
                {:remove, :test}
-             ] = Mode.parse(["+T-T+-+-+-+T-++-+--T"], modes)
+             ] = Mode.parse_modes(["+T-T+-+-+-+T-++-+--T"], modes)
     end
 
     test "defaults to applying when mode string does not start with a plus or minus" do
       modes = %{?T => {:no_param, :test, []}}
 
-      assert [{:add, :test}, {:remove, :test}] = Mode.parse(["T-T"], modes)
+      assert [{:add, :test}, {:remove, :test}] = Mode.parse_modes(["T-T"], modes)
     end
 
     test "handles unknown mode letters" do
-      assert [{:invalid, {:unknown_mode, ?T}}] = Mode.parse(["+T"], %{})
+      assert [{:invalid, {:unknown_mode, ?T}}] = Mode.parse_modes(["+T"], %{})
     end
   end
 
-  describe "build/2" do
+  describe "parse/2" do
+    test "parses mode string and applies parse functions to params" do
+      parse_fn = fn str ->
+        case Integer.parse(str) do
+          {int, ""} -> {:ok, int}
+          _ -> :error
+        end
+      end
+
+      modes = %{?T => {:param_always, :test, parse: parse_fn}}
+
+      assert [{:add, {:test, 42}}] = Mode.parse(["+T", "42"], modes)
+    end
+
+    test "returns invalid for bad param after parsing mode string" do
+      parse_fn = fn _ -> :error end
+      modes = %{?T => {:param_always, :test, parse: parse_fn}}
+
+      assert [{:invalid, {:invalid_param, :test, "bad"}}] = Mode.parse(["+T", "bad"], modes)
+    end
+
+    test "passes through string params when no parse function defined" do
+      modes = %{?T => {:param_always, :test, []}}
+
+      assert [{:add, {:test, "param"}}] = Mode.parse(["+T", "param"], modes)
+    end
+
+    test "handles modes without params end-to-end" do
+      modes = %{?T => {:no_param, :test, []}}
+
+      assert [{:add, :test}, {:remove, :test}] = Mode.parse(["+T-T"], modes)
+    end
+  end
+
+  describe "format_modes/2" do
     test "handles modes without a parameter" do
       modes = %{?T => {:no_param, :test, []}}
 
-      assert ["+T"] = Mode.build([{:add, :test}], modes)
+      assert ["+T"] = Mode.format_modes([{:add, :test}], modes)
     end
 
     test "handles modes with a parameter" do
       modes = %{?T => {:param_always, :test, []}}
 
-      assert ["+T", "foo"] = Mode.build([{:add, {:test, "foo"}}], modes)
+      assert ["+T", "foo"] = Mode.format_modes([{:add, {:test, "foo"}}], modes)
     end
 
     test "preserves mode order" do
@@ -155,7 +190,7 @@ defmodule IRCane.Protocol.ModeTest do
       }
 
       assert ["+abcd", "foo", "bar", "baz"] =
-               Mode.build(
+               Mode.format_modes(
                  [
                    {:add, {:mode_a, "foo"}},
                    {:add, {:mode_b, "bar"}},
@@ -170,7 +205,7 @@ defmodule IRCane.Protocol.ModeTest do
       modes = %{?T => {:no_param, :test, []}}
 
       assert ["+T-T+T-T"] =
-               Mode.build(
+               Mode.format_modes(
                  [
                    {:add, :test},
                    {:remove, :test},
@@ -183,13 +218,39 @@ defmodule IRCane.Protocol.ModeTest do
 
     test "skips unknown modes" do
       assert [""] =
-               Mode.build(
+               Mode.format_modes(
                  [
                    {:add, :not_a_mode},
                    {:add, {:not_a_mode, "foo"}}
                  ],
                  %{}
                )
+    end
+  end
+
+  describe "format/2" do
+    test "formats non-binary params and produces mode string" do
+      modes = %{?T => {:param_always, :test, format: &to_string/1}}
+
+      assert ["+T", "42"] = Mode.format([{:add, {:test, 42}}], modes)
+    end
+
+    test "uses inspect/1 as default format function for non-binary params" do
+      modes = %{?T => {:param_always, :test, []}}
+
+      assert ["+T", ":atom"] = Mode.format([{:add, {:test, :atom}}], modes)
+    end
+
+    test "passes through binary params unchanged" do
+      modes = %{?T => {:param_always, :test, []}}
+
+      assert ["+T", "param"] = Mode.format([{:add, {:test, "param"}}], modes)
+    end
+
+    test "handles modes without params end-to-end" do
+      modes = %{?T => {:no_param, :test, []}}
+
+      assert ["+T-T"] = Mode.format([{:add, :test}, {:remove, :test}], modes)
     end
   end
 
