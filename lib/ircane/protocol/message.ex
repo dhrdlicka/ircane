@@ -15,6 +15,20 @@ defmodule IRCane.Protocol.Message do
 
   @typep message :: String.t()
 
+  @spec new(source :: source | map | nil, command :: command, params :: params) :: t
+  def new(%{username: username, hostname: hostname, nickname: nickname}, command, params) do
+    new({nickname, username, hostname}, command, params)
+  end
+
+  def new(source, command, params) do
+    %__MODULE__{source: source, command: command, params: params}
+  end
+
+  @spec new(command :: command, params :: params) :: t
+  def new(command, params) do
+    new(nil, command, params)
+  end
+
   @spec parse(message) :: {:ok, t()} | {:error, atom()}
   def parse(":" <> message) do
     with [source, message] <- String.split(message, " ", parts: 2, trim: true),
@@ -43,22 +57,22 @@ defmodule IRCane.Protocol.Message do
     end
   end
 
-  @spec build(t) :: message
-  def build(%__MODULE__{source: {nickname, username, hostname}} = message) do
-    build(%{message | source: "#{nickname}!#{username}@#{hostname}"})
+  @spec format(t) :: message
+  def format(%__MODULE__{source: {nickname, username, hostname}} = message) do
+    format(%{message | source: "#{nickname}!#{username}@#{hostname}"})
   end
 
-  def build(%__MODULE__{source: source, command: command, params: params}) when source != nil do
-    build(":#{source} #{command}", params)
+  def format(%__MODULE__{source: source, command: command, params: params}) when source != nil do
+    format(":#{source} #{command}", params)
   end
 
-  def build(%__MODULE__{command: command, params: params}) do
-    build("#{command}", params)
+  def format(%__MODULE__{command: command, params: params}) do
+    format("#{command}", params)
   end
 
-  defp build(message, []), do: message
+  defp format(message, []), do: message
 
-  defp build(message, [trailing]) do
+  defp format(message, [trailing]) do
     if String.contains?("#{trailing}", [" ", ":"]) do
       "#{message} :#{trailing}"
     else
@@ -66,10 +80,10 @@ defmodule IRCane.Protocol.Message do
     end
   end
 
-  defp build(message, ["" | params]),
-    do: build(message, params)
+  defp format(message, ["" | params]),
+    do: format(message, params)
 
-  defp build(message, [param | params]) do
-    build("#{message} #{param}", params)
+  defp format(message, [param | params]) do
+    format("#{message} #{param}", params)
   end
 end

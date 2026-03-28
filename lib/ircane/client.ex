@@ -297,7 +297,7 @@ defmodule IRCane.Client do
   end
 
   defp send_message(%Message{} = message, %{transport: {mod, ref}} = state) do
-    raw_message = Message.build(message) <> "\r\n"
+    raw_message = Message.format(message) <> "\r\n"
     mod.send_message(ref, raw_message)
 
     Logger.debug(
