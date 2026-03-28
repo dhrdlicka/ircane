@@ -180,19 +180,17 @@ defmodule IRCane.Client do
   @impl true
   def terminate(reason, state) do
     identifier = state.nickname || state.hostname || "unknown"
-    quit_message = state.quit_message || "User process terminated unexpectedly"
+    message = state.quit_message || "User process terminated unexpectedly"
 
     state.joined_channels
     |> Map.keys()
-    |> Enum.each(&Channel.broadcast_quit(&1, state, quit_message))
+    |> Enum.each(&Channel.broadcast_quit(&1, state, message))
 
-    message =
-      %Message{
-        command: "ERROR",
-        params: [quit_message]
-      }
+    mask = "#{inspect(state.username)}@#{state.hostname}"
 
-    send_message(message, state)
+    {:error, "Closing link: (#{mask}) [#{message}]"}
+    |> Replies.format_message(state.nickname || "*")
+    |> Enum.each(&send_message(&1, state))
 
     case reason do
       :normal ->

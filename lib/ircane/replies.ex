@@ -393,6 +393,10 @@ defmodule IRCane.Replies do
     [%Message{source: source.nickname, command: "KICK", params: [channel, target, reason]}]
   end
 
+  def format_message({:error, reason}, _client) do
+    [%Message{source: @server_name, command: "ERROR", params: [reason]}]
+  end
+
   def format_message(other, client) do
     [format_numeric(other, client)]
   end
