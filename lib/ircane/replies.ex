@@ -112,7 +112,7 @@ defmodule IRCane.Replies do
         mode_strings =
           modes
           |> Enum.map(&{:add, &1})
-          |> Mode.parse(@channel_modes)
+          |> Mode.format(@channel_modes)
 
         %Message{source: @server_name, command: "324", params: [client, target | mode_strings]}
 
