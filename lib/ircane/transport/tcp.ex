@@ -82,7 +82,7 @@ defmodule IRCane.Transport.TCP do
   end
 
   @impl ThousandIsland.Handler
-  def handle_data(data, _socket, state) do
+  def handle_data(data, socket, state) do
     case state.buffer <> data do
       new_buffer when byte_size(new_buffer) <= @max_buffer_size ->
         {rest, lines} =
@@ -99,8 +99,7 @@ defmodule IRCane.Transport.TCP do
 
       _ ->
         Client.transport_error(state.client_pid, :buffer_overflow)
-
-        send_error(state, "Input buffer overflow")
+        send_error(state, socket, "Input buffer overflow")
 
         {:close, state}
     end
@@ -118,11 +117,11 @@ defmodule IRCane.Transport.TCP do
     Client.transport_error(state.client_pid, reason)
   end
 
-  defp send_error(state, reason) do
+  defp send_error(state, socket, reason) do
     mask = "#{state.username || "unknown"}@#{state.hostname}"
 
     {:error, "Closing link: (#{mask}) [#{reason}]"}
     |> Replies.format_message()
-    |> Enum.each(&ThousandIsland.Socket.send(state.socket, &1))
+    |> Enum.each(&ThousandIsland.Socket.send(socket, &1))
   end
 end
