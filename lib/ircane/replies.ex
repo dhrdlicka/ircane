@@ -2,6 +2,7 @@ defmodule IRCane.Replies do
   alias IRCane.Channel.Role
   alias IRCane.Protocol.Message
   alias IRCane.Protocol.Mode
+  alias IRCane.Utils.ISupport
 
   @network_name "TestNet"
   @server_name "localhost"
@@ -43,20 +44,19 @@ defmodule IRCane.Replies do
         }
 
       :i_support ->
-        %Message{
-          source: @server_name,
-          command: "005",
-          params: [
-            client,
-            "CASEMAPPING=ascii",
-            "CHANMODES=b,k,l,imnst",
-            "CHANTYPES=#",
-            "MODES=4",
-            "NETWORK=#{@network_name}",
-            "PREFIX=(ov)@+",
-            "are supported by this server"
-          ]
-        }
+        ISupport.build()
+        |> Enum.map(fn
+          {key, value} -> "#{key |> Atom.to_string() |> String.upcase()}=#{value}"
+          token -> token |> Atom.to_string() |> String.upcase()
+        end)
+        |> Enum.chunk_every(13)
+        |> Enum.map(
+          &%Message{
+            source: @server_name,
+            command: "005",
+            params: [client | &1] ++ ["are supported by this server"]
+          }
+        )
 
       {:luser_client, users, invisibles, servers} ->
         %Message{
