@@ -107,10 +107,7 @@ defmodule IRCane.Client do
 
   @impl true
   def handle_call({:privmsg, source, message}, _from, state) do
-    {:privmsg, source, state.nickname, message}
-    |> Replies.format_message(state.nickname)
-    |> Enum.each(&send_message(&1, state))
-
+    send_message(state, {:privmsg, source, state.nickname, message})
     {:reply, :ok, state}
   end
 
@@ -119,20 +116,14 @@ defmodule IRCane.Client do
     if :queue.member(ref, state.seen_events) do
       {:noreply, state}
     else
-      message
-      |> Replies.format_message(state.nickname)
-      |> Enum.each(&send_message(&1, state))
-
+      send_message(state, message)
       {:noreply, %{state | seen_events: push_event(state.seen_events, ref)}}
     end
   end
 
   @impl true
   def handle_cast({:notice, source, message}, state) do
-    {:notice, source, state.nickname, message}
-    |> Replies.format_message(state.nickname)
-    |> Enum.each(&send_message(&1, state))
-
+    send_message(state, {:notice, source, state.nickname, message})
     {:noreply, state}
   end
 
@@ -172,10 +163,7 @@ defmodule IRCane.Client do
     {channel_info, joined_channels} = Map.pop(state.joined_channels, pid)
 
     if channel_info do
-      {:kick, :server, channel_info.name, state.nickname,
-       "Channel process terminated unexpectedly"}
-      |> Replies.format_message(state.nickname)
-      |> Enum.each(&send_message(&1, state))
+      send_message(state, {:kick, :server, channel_info.name, state.nickname})
 
       {:noreply, %{state | joined_channels: joined_channels}}
     else
@@ -194,9 +182,7 @@ defmodule IRCane.Client do
 
     mask = "#{state.username || "unknown"}@#{state.hostname}"
 
-    {:error, "Closing link: (#{mask}) [#{message}]"}
-    |> Replies.format_message(state.nickname)
-    |> Enum.each(&send_message(&1, state))
+    send_message(state, {:error, "Closing link: (#{mask}) [#{message}]"})
 
     case reason do
       :normal ->
@@ -214,15 +200,11 @@ defmodule IRCane.Client do
   defp handle_line(_line, %{disconnecting?: true} = state), do: state
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
-    :input_too_long
-    |> Replies.format_message(state.nickname)
-    |> Enum.each(&send_message(&1, state))
-
     Logger.warning(
       "Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes"
     )
 
-    state
+    send_message(state, :input_too_long)
   end
 
   defp handle_line(line, state) do
@@ -231,7 +213,6 @@ defmodule IRCane.Client do
     case Message.parse(line) do
       {:ok, %{command: command, params: params}} ->
         command
-        |> String.upcase()
         |> handle_command(params, state)
         |> maybe_register()
 
@@ -245,23 +226,15 @@ defmodule IRCane.Client do
   end
 
   defp handle_command(command, params, state) do
-    case run_command(command, params, state) do
+    case command |> String.upcase() |> run_command(params, state) do
       {:ok, new_state} ->
         new_state
 
       {:ok, result, new_state} ->
-        result
-        |> Replies.format_message(new_state.nickname)
-        |> Enum.each(&send_message(&1, new_state))
-
-        new_state
+        send_message(new_state, result)
 
       {:error, error} ->
-        error
-        |> Replies.format_message(state.nickname)
-        |> Enum.each(&send_message(&1, state))
-
-        state
+        send_message(state, error)
     end
   end
 
@@ -290,11 +263,8 @@ defmodule IRCane.Client do
        when not is_nil(nick) and not is_nil(user) do
     Logger.notice("User registered: #{state.nickname}!#{state.username}@#{state.hostname}")
 
-    [:welcome, :your_host, :created, :my_info, :i_support]
-    |> Replies.format_message(state.nickname)
-    |> Enum.each(&send_message(&1, state))
-
     %{state | registered?: true}
+    |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
     |> cmd("LUSERS", [])
     |> cmd("MOTD", [])
   end
@@ -303,7 +273,15 @@ defmodule IRCane.Client do
     state
   end
 
-  defp send_message(%Message{} = message, %{transport: {mod, ref}} = state) do
+  defp send_message(state, message) do
+    message
+    |> Replies.format_message(state.nickname)
+    |> Enum.each(&do_send_message(&1, state))
+
+    state
+  end
+
+  defp do_send_message(%Message{} = message, %{transport: {mod, ref}} = state) do
     raw_message = Message.format(message) <> "\r\n"
     mod.send_message(ref, raw_message)
 
