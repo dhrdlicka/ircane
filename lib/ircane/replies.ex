@@ -327,6 +327,54 @@ defmodule IRCane.Replies do
     [%Message{source: source.nickname, command: "NOTICE", params: [target, message]}]
   end
 
+  def format_message(:looking_up_hostname, client) do
+    target = client || "*"
+
+    [
+      %Message{
+        source: @server_name,
+        command: "NOTICE",
+        params: [target, "*** Looking up your hostname..."]
+      }
+    ]
+  end
+
+  def format_message({:found_hostname, hostname}, client) do
+    target = client || "*"
+
+    [
+      %Message{
+        source: @server_name,
+        command: "NOTICE",
+        params: [target, "*** Found your hostname: #{hostname}"]
+      }
+    ]
+  end
+
+  def format_message({:could_not_resolve_hostname, hostname}, client) do
+    target = client || "*"
+
+    [
+      %Message{
+        source: @server_name,
+        command: "NOTICE",
+        params: [target, "*** Could not resolve your hostname; using #{hostname}"]
+      }
+    ]
+  end
+
+  def format_message({:reverse_lookup_failed, hostname}, client) do
+    target = client || "*"
+
+    [
+      %Message{
+        source: @server_name,
+        command: "NOTICE",
+        params: [target, "*** Reverse lookup failed; using #{hostname}"]
+      }
+    ]
+  end
+
   def format_message({:quit, source, quit_message}, _client) do
     [%Message{source: source.nickname, command: "QUIT", params: [quit_message]}]
   end

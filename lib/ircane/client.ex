@@ -147,15 +147,45 @@ defmodule IRCane.Client do
   def handle_continue(:init, %{transport: {mod, ref}} = state) do
     %{hostname: hostname} = mod.finish_handshake(ref)
 
-    case ReverseDNSResolver.resolve(hostname) do
-      {:ok, resolved_hostname} ->
-        Logger.debug("Reverse DNS lookup successful for #{hostname}: #{resolved_hostname}")
-        {:noreply, %{state | hostname: resolved_hostname}}
+    send_message(state, :looking_up_hostname)
 
-      {:error, reason} ->
-        Logger.warning("Reverse DNS lookup failed for #{hostname}: #{inspect(reason)}")
-        {:noreply, %{state | hostname: hostname}}
-    end
+    %{ref: rdns_ref} =
+      Task.Supervisor.async_nolink(IRCane.TaskSupervisor, fn ->
+        ReverseDNSResolver.resolve(hostname)
+      end)
+
+    {:noreply, %{state | hostname: hostname, rdns_ref: rdns_ref}}
+  end
+
+  @impl true
+  def handle_info({ref, result}, %{rdns_ref: ref} = state) do
+    Process.demonitor(ref, [:flush])
+
+    new_state =
+      case result do
+        {:ok, resolved_hostname} ->
+          Logger.debug(
+            "Reverse DNS lookup successful for #{state.hostname}: #{resolved_hostname}"
+          )
+
+          send_message(
+            %{state | hostname: resolved_hostname},
+            {:found_hostname, resolved_hostname}
+          )
+
+        {:error, reason} ->
+          Logger.warning("Reverse DNS lookup failed for #{state.hostname}: #{inspect(reason)}")
+          send_message(state, {:could_not_resolve_hostname, state.hostname})
+      end
+
+    {:noreply, maybe_register(%{new_state | rdns_ref: nil})}
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{rdns_ref: ref} = state) do
+    Logger.warning("Reverse DNS task crashed for #{state.hostname}: #{inspect(reason)}")
+    send_message(state, {:reverse_lookup_failed, state.hostname})
+    {:noreply, maybe_register(%{state | rdns_ref: nil})}
   end
 
   @impl true
@@ -259,9 +289,11 @@ defmodule IRCane.Client do
 
   defp cmd(state, command, params), do: handle_command(command, params, state)
 
-  defp maybe_register(%{registered?: false, nickname: nick, username: user} = state)
+  defp maybe_register(
+         %{registered?: false, nickname: nick, username: user, rdns_ref: nil} = state
+       )
        when not is_nil(nick) and not is_nil(user) do
-    Logger.notice("User registered: #{state.nickname}!#{state.username}@#{state.hostname}")
+    Logger.notice("User registered: #{nick}!#{user}@#{state.hostname}")
 
     %{state | registered?: true}
     |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
