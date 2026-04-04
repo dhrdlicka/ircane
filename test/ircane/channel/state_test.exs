@@ -17,7 +17,7 @@ defmodule IRCane.Channel.StateTest do
 
     copy(Modes)
 
-    {:ok, state} = ChannelState.create("#prejoined")
+    {:ok, state} = ChannelState.new("#prejoined")
 
     stub(Modes, :authorize, fn
       ^state, :join, _client, _opts -> :ok
@@ -28,9 +28,9 @@ defmodule IRCane.Channel.StateTest do
     {:ok, client: client, prejoined: prejoined}
   end
 
-  describe "create/1" do
+  describe "new/1" do
     test "creates a new channel state with the given name" do
-      assert {:ok, state} = ChannelState.create("#test")
+      assert {:ok, state} = ChannelState.new("#test")
 
       assert %{
                name: "#test",
@@ -42,11 +42,21 @@ defmodule IRCane.Channel.StateTest do
 
       assert map_size(state.members) == 0
     end
+
+    test "returns an error if channel name does not start with a valid prefix" do
+      assert {:error, {:bad_chan_mask, "test"}} = ChannelState.new("test")
+    end
+
+    test "returns an error if channel name contains invalid characters" do
+      assert {:error, {:bad_chan_mask, "#bad channel"}} = ChannelState.new("#bad channel")
+      assert {:error, {:bad_chan_mask, "#bad,channel"}} = ChannelState.new("#bad,channel")
+      assert {:error, {:bad_chan_mask, "#bad\achannel"}} = ChannelState.new("#bad\achannel")
+    end
   end
 
   describe "join/4" do
     test "allows a client to join a channel", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, _opts -> :ok
@@ -56,7 +66,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "saves membership information", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, _opts -> :ok
@@ -78,7 +88,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "does not allow a client to join twice", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, 1, fn
         ^state, :join, ^client, _opts -> :ok
@@ -90,7 +100,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "makes the first member an operator", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, _opts -> :ok
@@ -104,7 +114,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "does not make subsequent new members operators", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, 2, fn
         _state, :join, _client, _opts -> :ok
@@ -124,7 +134,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "denies join if Modes.authorize/4 returns an error", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, _opts -> {:error, :banned_from_chan}
@@ -134,7 +144,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "passes channel key to Modes.authorize/4", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, opts ->
@@ -146,7 +156,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "passes nil key to Modes.authorize/4 when no key is provided", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       expect(Modes, :authorize, fn
         ^state, :join, ^client, opts ->
@@ -166,7 +176,7 @@ defmodule IRCane.Channel.StateTest do
     end
 
     test "returns an error if the client is not on the channel", %{client: client} do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       assert {:error, :not_on_channel} = ChannelState.part(state, client)
     end
@@ -182,7 +192,7 @@ defmodule IRCane.Channel.StateTest do
     test "returns unchanged state and nil member if the client was not on the channel", %{
       client: client
     } do
-      {:ok, state} = ChannelState.create("#test")
+      {:ok, state} = ChannelState.new("#test")
 
       assert {^state, nil} = ChannelState.quit(state, client.pid)
     end

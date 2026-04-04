@@ -30,8 +30,7 @@ defmodule IRCane.Commands.Join do
   end
 
   defp join_channel(channel_name, key, state) do
-    with :ok <- validate_channel_name(channel_name),
-         {:ok, channel_pid} <- do_join(channel_name, key, state),
+    with {:ok, channel_pid} <- do_join(channel_name, key, state),
          {:ok, {channel_name, topic}} <- Channel.topic(channel_pid),
          {:ok, {_channel_name, names}} <- Channel.names(channel_pid) do
       channel_info = %{
@@ -68,21 +67,6 @@ defmodule IRCane.Commands.Join do
     end
   end
 
-  defp validate_channel_name("#" <> _ = channel_name) do
-    channel_name
-    |> String.to_charlist()
-    |> Enum.all?(fn char -> char not in ~c" ,\07" end)
-    |> if do
-      :ok
-    else
-      {:error, {:invalid_channel_name, channel_name}}
-    end
-  end
-
-  defp validate_channel_name(channel_name) do
-    {:error, {:invalid_channel_name, channel_name}}
-  end
-
   defp do_join(channel_name, key, state, attempts \\ @max_join_attempts)
 
   defp do_join(channel_name, _key, _state, 0) do
@@ -104,7 +88,7 @@ defmodule IRCane.Commands.Join do
 
           error ->
             Logger.warning("Failed to create channel #{channel_name}: #{inspect(error)}")
-            do_join(channel_name, key, state, attempts - 1)
+            error
         end
 
       error ->

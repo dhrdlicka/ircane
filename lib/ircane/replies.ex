@@ -207,13 +207,6 @@ defmodule IRCane.Replies do
           params: [client, channel, "You're not on that channel"]
         }
 
-      {:bad_chan_mask, channel} ->
-        %Message{
-          source: @server_name,
-          command: "442",
-          params: [client, channel, "Bad Channel Mask"]
-        }
-
       {:nickname_in_use, nickname} ->
         %Message{
           source: @server_name,
@@ -254,6 +247,13 @@ defmodule IRCane.Replies do
           source: @server_name,
           command: "475",
           params: [client, channel, "Cannot join channel (+k)"]
+        }
+
+      {:bad_chan_mask, channel} ->
+        %Message{
+          source: @server_name,
+          command: "476",
+          params: [client, channel, "Bad Channel Mask"]
         }
 
       {:chan_o_privs_needed, channel} ->

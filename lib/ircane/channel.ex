@@ -18,6 +18,7 @@ defmodule IRCane.Channel do
     GenServer.start_link(__MODULE__, opts, name: via_tuple(channel_name))
   end
 
+  @spec state(String.t() | GenServer.server()) :: {:ok, ChannelState.t()} | {:error, term()}
   def state(channel_name) when is_binary(channel_name) do
     state(via_tuple(channel_name))
   catch
@@ -164,7 +165,7 @@ defmodule IRCane.Channel do
 
     Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ -> channel_name end)
 
-    ChannelState.create(channel_name)
+    ChannelState.new(channel_name)
   end
 
   @impl true

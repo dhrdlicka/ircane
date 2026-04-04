@@ -30,9 +30,14 @@ defmodule IRCane.Channel.State do
             new: boolean()
           }
 
-  @spec create(String.t()) :: {:ok, t()} | {:error, atom()}
-  def create(name) do
-    {:ok, %__MODULE__{name: name}}
+  @spec new(String.t()) :: {:ok, t()} | {:error, atom()}
+  def new(name) do
+    with true <- String.starts_with?(name, ["#"]),
+         false <- String.contains?(name, [" ", ",", "\a"]) do
+      {:ok, %__MODULE__{name: name}}
+    else
+      _ -> {:error, {:bad_chan_mask, name}}
+    end
   end
 
   @spec join(t(), Client.t(), reference(), String.t() | nil) ::
