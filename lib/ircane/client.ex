@@ -16,6 +16,7 @@ defmodule IRCane.Client do
             username: nil,
             hostname: nil,
             realname: nil,
+            rdns_ref: nil,
             registered?: false,
             disconnecting?: false,
             operator?: true,
@@ -113,11 +114,15 @@ defmodule IRCane.Client do
 
   @impl true
   def handle_cast({:deliver, ref, _from, message}, state) do
-    if :queue.member(ref, state.seen_events) do
+    if received_event?(state, ref) do
       {:noreply, state}
     else
-      send_message(state, message)
-      {:noreply, %{state | seen_events: push_event(state.seen_events, ref)}}
+      new_state =
+        state
+        |> send_message(message)
+        |> push_event(ref)
+
+      {:noreply, new_state}
     end
   end
 
@@ -324,14 +329,18 @@ defmodule IRCane.Client do
     :ok
   end
 
-  defp push_event(events, event_id) do
+  defp received_event?(state, event_id) do
+    :queue.member(event_id, state.seen_events)
+  end
+
+  defp push_event(%{seen_events: events} = state, event_id) do
     queue = :queue.in(event_id, events)
 
     if :queue.len(queue) > @event_dedup_size do
-      {_, queue} = :queue.out(queue)
-      queue
+      {_, new_queue} = :queue.out(queue)
+      %{state | seen_events: new_queue}
     else
-      queue
+      %{state | seen_events: queue}
     end
   end
 end
