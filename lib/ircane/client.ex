@@ -108,18 +108,14 @@ defmodule IRCane.Client do
     |> Map.keys()
     |> Enum.each(&Channel.broadcast_quit(&1, state.user, message))
 
-    mask = "#{state.user.username || "unknown"}@#{state.user.hostname}"
-
-    send_message(state, {:error, "Closing link: (#{mask}) [#{message}]"})
+    send_message(state, {:error, "Closing link: (#{host_mask(state)}) [#{message}]"})
 
     case reason do
       :normal ->
-        Logger.debug("Client #{state.user.nickname || mask} disconnected normally")
+        Logger.debug("Client #{client_id(state)} disconnected normally")
 
       _ ->
-        Logger.error(
-          "Client #{state.user.nickname || mask} terminated abnormally: #{inspect(reason)}"
-        )
+        Logger.error("Client #{client_id(state)} terminated abnormally: #{inspect(reason)}")
     end
 
     if state.user.registered? do
@@ -199,7 +195,7 @@ defmodule IRCane.Client do
       case result do
         {:ok, resolved_hostname} ->
           Logger.debug(
-            "Reverse DNS lookup successful for #{state.user.hostname}: #{resolved_hostname}"
+            "Reverse DNS lookup successful for #{client_id(state)}: #{resolved_hostname}"
           )
 
           send_message(
@@ -208,10 +204,7 @@ defmodule IRCane.Client do
           )
 
         {:error, reason} ->
-          Logger.warning(
-            "Reverse DNS lookup failed for #{state.user.hostname}: #{inspect(reason)}"
-          )
-
+          Logger.warning("Reverse DNS lookup failed for #{client_id(state)}: #{inspect(reason)}")
           send_message(state, {:could_not_resolve_hostname, state.user.hostname})
       end
 
@@ -219,7 +212,7 @@ defmodule IRCane.Client do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{rdns_ref: ref} = state) do
-    Logger.warning("Reverse DNS task crashed for #{state.user.hostname}: #{inspect(reason)}")
+    Logger.warning("Reverse DNS task crashed for #{client_id(state)}: #{inspect(reason)}")
     send_message(state, {:reverse_lookup_failed, state.user.hostname})
     {:noreply, maybe_register(%{state | rdns_ref: nil})}
   end
@@ -243,17 +236,12 @@ defmodule IRCane.Client do
   defp handle_line(_line, %{disconnecting?: true} = state), do: state
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
-    Logger.warning(
-      "Line too long from #{state.user.nickname || state.user.hostname || "unknown"}: #{byte_size(line)} bytes"
-    )
-
+    Logger.warning("Line too long from #{client_id(state)}: #{byte_size(line)} bytes")
     send_message(state, :input_too_long)
   end
 
   defp handle_line(line, state) do
-    Logger.debug(
-      "[#{state.user.nickname || state.user.hostname || "unknown"}] << #{String.trim(line)}"
-    )
+    Logger.debug("[#{client_id(state)}] << #{String.trim(line)}")
 
     case Message.parse(line) do
       {:ok, %{command: command, params: params}} ->
@@ -263,10 +251,7 @@ defmodule IRCane.Client do
         |> update_disconnecting()
 
       {:error, reason} ->
-        Logger.debug(
-          "Failed to parse message from #{state.user.nickname || state.user.hostname || "unknown"}: #{inspect(reason)}"
-        )
-
+        Logger.debug("Failed to parse message from #{client_id(state)}: #{inspect(reason)}")
         state
     end
   end
@@ -292,10 +277,7 @@ defmodule IRCane.Client do
   defp run_command(command, params, user_state) do
     case Map.get(@command_handlers, command) do
       nil ->
-        Logger.debug(
-          "Unknown command from #{user_state.nickname || user_state.hostname || "unknown"}: #{command}"
-        )
-
+        Logger.debug("Unknown command from #{client_id(user_state)}: #{command}")
         {:error, {:unknown_command, command}}
 
       handler ->
@@ -346,9 +328,7 @@ defmodule IRCane.Client do
     raw_message = Message.format(message) <> "\r\n"
     mod.send_message(ref, raw_message)
 
-    Logger.debug(
-      "[#{state.user.nickname || state.user.hostname || "unknown"}] >> #{String.trim(raw_message)}"
-    )
+    Logger.debug("[#{client_id(state)}] >> #{String.trim(raw_message)}")
 
     :ok
   end
@@ -366,5 +346,17 @@ defmodule IRCane.Client do
     else
       %{state | seen_events: queue}
     end
+  end
+
+  defp client_id(%{user: user}), do: client_id(user)
+
+  defp client_id(user) do
+    user.nickname || host_mask(user)
+  end
+
+  defp host_mask(%{user: user}), do: host_mask(user)
+
+  defp host_mask(user) do
+    "#{user.username || "unknown"}@#{user.hostname || "unknown"}}"
   end
 end
