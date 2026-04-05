@@ -12,7 +12,7 @@ defmodule IRCane.Commands.Nick do
 
         ref = make_ref()
 
-        state.joined_channels
+        state.channels
         |> Map.keys()
         |> Enum.each(&Channel.broadcast_nick(&1, ref, state, new_nickname))
 
