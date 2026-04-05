@@ -128,7 +128,6 @@ defmodule IRCane.Client do
     {:reply, {:ok, state}, state}
   end
 
-  @impl GenServer
   def handle_call({:privmsg, source, message}, _from, state) do
     send_message(state, {:privmsg, source, state.user.nickname, message})
     {:reply, :ok, state}
@@ -176,15 +175,17 @@ defmodule IRCane.Client do
   def handle_continue(:init, %{transport: {mod, ref}} = state) do
     %{hostname: hostname} = mod.finish_handshake(ref)
 
-    send_message(state, :looking_up_hostname)
+    send_message(state, :rdns_in_progress)
 
     %{ref: rdns_ref} =
       Task.Supervisor.async_nolink(IRCane.TaskSupervisor, fn ->
         ReverseDNSResolver.resolve(hostname)
       end)
 
-    {:noreply,
-     %{state | user: UserState.update_hostname(state.user, hostname), rdns_ref: rdns_ref}}
+    new_state =
+      %{state | user: UserState.update_hostname(state.user, hostname), rdns_ref: rdns_ref}
+
+    {:noreply, new_state}
   end
 
   @impl GenServer
@@ -192,40 +193,31 @@ defmodule IRCane.Client do
     Process.demonitor(ref, [:flush])
 
     new_state =
-      case result do
-        {:ok, resolved_hostname} ->
-          Logger.debug(
-            "Reverse DNS lookup successful for #{client_id(state)}: #{resolved_hostname}"
-          )
+      state
+      |> finish_rdns(result)
+      |> maybe_register()
 
-          send_message(
-            %{state | user: UserState.update_hostname(state.user, resolved_hostname)},
-            {:found_hostname, resolved_hostname}
-          )
-
-        {:error, reason} ->
-          Logger.warning("Reverse DNS lookup failed for #{client_id(state)}: #{inspect(reason)}")
-          send_message(state, {:could_not_resolve_hostname, state.user.hostname})
-      end
-
-    {:noreply, maybe_register(%{new_state | rdns_ref: nil})}
+    {:noreply, new_state}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{rdns_ref: ref} = state) do
-    Logger.warning("Reverse DNS task crashed for #{client_id(state)}: #{inspect(reason)}")
-    send_message(state, {:reverse_lookup_failed, state.user.hostname})
-    {:noreply, maybe_register(%{state | rdns_ref: nil})}
+    new_state =
+      state
+      |> finish_rdns({:error, {:crashed, reason}})
+      |> maybe_register()
+
+    {:noreply, new_state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
-    {channel_info, joined_channels} = Map.pop(state.joined_channels, pid)
+    case UserState.pop_channel(state.user, pid) do
+      {nil, _} ->
+        Logger.warning("Received DOWN message for unknown channel process #{inspect(pid)}")
+        {:noreply, state}
 
-    if channel_info do
-      send_message(state, {:kick, :server, channel_info.name, state.user.nickname})
-
-      {:noreply, %{state | joined_channels: joined_channels}}
-    else
-      {:noreply, state}
+      {%{name: channel_name}, updated_user} ->
+        send_message(state, {:kick, :server, channel_name, state.user.nickname, "Channel process terminated"})
+        {:noreply, %{state | user: updated_user}}
     end
   end
 
@@ -331,6 +323,20 @@ defmodule IRCane.Client do
     Logger.debug("[#{client_id(state)}] >> #{String.trim(raw_message)}")
 
     :ok
+  end
+
+  defp finish_rdns(state, result) do
+    case result do
+      {:ok, resolved_hostname} ->
+        Logger.debug("Reverse DNS lookup successful for #{client_id(state)}: #{resolved_hostname}")
+
+        updated_user = UserState.update_hostname(state.user, resolved_hostname)
+        send_message(%{state | rdns_ref: nil, user: updated_user}, {:rdns_successful, resolved_hostname})
+
+      {:error, reason} ->
+        Logger.warning("Reverse DNS lookup failed for #{client_id(state)}: #{inspect(reason)}")
+        send_message(%{state | rdns_ref: nil}, {:rdns_failed, state.user.hostname})
+    end
   end
 
   defp received_event?(state, event_id) do

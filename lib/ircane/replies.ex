@@ -328,52 +328,16 @@ defmodule IRCane.Replies do
     [%Message{source: source.nickname, command: "NOTICE", params: [target, message]}]
   end
 
-  def format_message(:looking_up_hostname, client) do
-    target = client || "*"
-
-    [
-      %Message{
-        source: @server_name,
-        command: "NOTICE",
-        params: [target, "*** Looking up your hostname..."]
-      }
-    ]
+  def format_message(:rdns_in_progress, client) do
+    [server_notice("*** Looking up your hostname...", client)]
   end
 
-  def format_message({:found_hostname, hostname}, client) do
-    target = client || "*"
-
-    [
-      %Message{
-        source: @server_name,
-        command: "NOTICE",
-        params: [target, "*** Found your hostname: #{hostname}"]
-      }
-    ]
+  def format_message({:rdns_successful, hostname}, client) do
+    [server_notice("*** Found your hostname: #{hostname}", client)]
   end
 
-  def format_message({:could_not_resolve_hostname, hostname}, client) do
-    target = client || "*"
-
-    [
-      %Message{
-        source: @server_name,
-        command: "NOTICE",
-        params: [target, "*** Could not resolve your hostname; using #{hostname}"]
-      }
-    ]
-  end
-
-  def format_message({:reverse_lookup_failed, hostname}, client) do
-    target = client || "*"
-
-    [
-      %Message{
-        source: @server_name,
-        command: "NOTICE",
-        params: [target, "*** Reverse lookup failed; using #{hostname}"]
-      }
-    ]
+  def format_message({:rdns_failed, hostname}, client) do
+    [server_notice("*** Could not resolve your hostname; using your IP address (#{hostname}) instead", client)]
   end
 
   def format_message({:quit, source, quit_message}, _client) do
@@ -452,5 +416,15 @@ defmodule IRCane.Replies do
 
   def format_message(other, client) do
     [format_numeric(other, client)]
+  end
+
+  defp server_notice(message, client) do
+    target = client || "*"
+
+    %Message{
+      source: @server_name,
+      command: "NOTICE",
+      params: [target, message]
+    }
   end
 end
