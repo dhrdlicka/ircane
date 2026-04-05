@@ -40,9 +40,9 @@ defmodule IRCane.Stats do
     GenServer.cast(__MODULE__, :user_registered)
   end
 
-  @spec user_unregistered() :: :ok
-  def user_unregistered do
-    GenServer.cast(__MODULE__, :user_unregistered)
+  @spec user_quit() :: :ok
+  def user_quit do
+    GenServer.cast(__MODULE__, :user_quit)
   end
 
   @spec channel_created() :: :ok
@@ -99,7 +99,7 @@ defmodule IRCane.Stats do
   end
 
   @impl true
-  def handle_cast(:user_unregistered, state) do
+  def handle_cast(:user_quit, state) do
     {:noreply, %{state | current_users: max(0, state.current_users - 1)}}
   end
 

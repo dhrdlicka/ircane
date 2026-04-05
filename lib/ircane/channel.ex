@@ -7,6 +7,7 @@ defmodule IRCane.Channel do
   alias IRCane.Client
   alias IRCane.Protocol.Mode
   alias IRCane.Stats
+  alias IRCane.User.State, as: UserState
 
   require Logger
 
@@ -31,17 +32,17 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :state)
   end
 
-  @spec broadcast_nick(GenServer.server(), reference(), Client.t(), String.t()) :: :ok
+  @spec broadcast_nick(GenServer.server(), reference(), UserState.t(), String.t()) :: :ok
   def broadcast_nick(pid, ref, from, new_nickname) do
     GenServer.cast(pid, {:broadcast_nick, ref, from, new_nickname})
   end
 
-  @spec broadcast_quit(GenServer.server(), Client.t(), String.t()) :: :ok
+  @spec broadcast_quit(GenServer.server(), UserState.t(), String.t()) :: :ok
   def broadcast_quit(pid, from, quit_message) do
     GenServer.cast(pid, {:broadcast_quit, from, quit_message})
   end
 
-  @spec join(String.t() | GenServer.server(), Client.t(), String.t() | nil) ::
+  @spec join(String.t() | GenServer.server(), UserState.t(), String.t() | nil) ::
           {:ok, pid()} | :noop | {:error, term()}
   def join(channel_name, client, key) when is_binary(channel_name) do
     join(via_tuple(channel_name), client, key)
@@ -54,7 +55,7 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:join, client, key})
   end
 
-  @spec part(String.t() | GenServer.server(), Client.t(), String.t()) ::
+  @spec part(String.t() | GenServer.server(), UserState.t(), String.t()) ::
           {:ok, pid()} | {:error, term()}
   def part(channel_name, client, reason) when is_binary(channel_name) do
     part(via_tuple(channel_name), client, reason)
@@ -80,7 +81,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :names)
   end
 
-  @spec privmsg(String.t() | GenServer.server(), Client.t(), String.t()) :: :ok | {:error, term()}
+  @spec privmsg(String.t() | GenServer.server(), UserState.t(), String.t()) ::
+          :ok | {:error, term()}
   def privmsg(channel_name, client, message) when is_binary(channel_name) do
     privmsg(via_tuple(channel_name), client, message)
   catch
@@ -92,7 +94,8 @@ defmodule IRCane.Channel do
     GenServer.call(pid, {:privmsg, client, message})
   end
 
-  @spec notice(String.t() | GenServer.server(), Client.t(), String.t()) :: :ok | {:error, term()}
+  @spec notice(String.t() | GenServer.server(), UserState.t(), String.t()) ::
+          :ok | {:error, term()}
   def notice(channel_name, client, message) when is_binary(channel_name) do
     notice(via_tuple(channel_name), client, message)
   catch
@@ -117,7 +120,7 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :topic)
   end
 
-  @spec update_topic(String.t() | GenServer.server(), Client.t(), String.t()) ::
+  @spec update_topic(String.t() | GenServer.server(), UserState.t(), String.t()) ::
           :ok | {:error, term()}
   def update_topic(channel_name, client, new_topic) when is_binary(channel_name) do
     update_topic(via_tuple(channel_name), client, new_topic)
@@ -143,7 +146,7 @@ defmodule IRCane.Channel do
     GenServer.call(pid, :mode)
   end
 
-  @spec update_mode(String.t() | GenServer.server(), Client.t(), [Mode.mode_change()]) ::
+  @spec update_mode(String.t() | GenServer.server(), UserState.t(), [Mode.mode_change()]) ::
           {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
   def update_mode(channel_name, client, updates) when is_binary(channel_name) do
     update_mode(via_tuple(channel_name), client, updates)
@@ -168,7 +171,9 @@ defmodule IRCane.Channel do
       Stats.channel_created()
       Logger.info("Channel #{channel_name} process started")
 
-      Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ -> channel_name end)
+      Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ ->
+        channel_name
+      end)
 
       result
     end

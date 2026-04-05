@@ -1,5 +1,6 @@
 defmodule IRCane.Commands.Part do
   alias IRCane.Channel
+  alias IRCane.User.State, as: UserState
 
   def handle([channels | rest], state) do
     reason = Enum.join(rest, " ")
@@ -8,10 +9,7 @@ defmodule IRCane.Commands.Part do
     |> String.split(",")
     |> Enum.uniq_by(&String.downcase/1)
     |> Enum.reduce({[], state}, fn channel_name, {replies, current_state} ->
-      case part_channel(channel_name, state, reason) do
-        {:ok, new_state} ->
-          {replies, new_state}
-
+      case part_channel(channel_name, current_state, reason) do
         {:ok, reply, new_state} ->
           {[reply | replies], new_state}
 
@@ -28,9 +26,9 @@ defmodule IRCane.Commands.Part do
 
   defp part_channel(channel_name, state, reason) do
     with {:ok, channel_pid} <- Channel.part(channel_name, state, reason) do
-      {%{monitor_ref: ref}, joined_channels} = Map.pop(state.joined_channels, channel_pid)
+      {%{monitor_ref: ref}, new_state} = UserState.pop_channel(state, channel_pid)
       Process.demonitor(ref)
-      new_state = %{state | joined_channels: joined_channels}
+
       {:ok, {:part, state, channel_name, reason}, new_state}
     end
   end

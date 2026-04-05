@@ -1,6 +1,7 @@
 defmodule IRCane.Commands.Join do
   alias IRCane.Channel
   alias IRCane.ChannelSupervisor
+  alias IRCane.User.State, as: UserState
 
   require Logger
 
@@ -33,15 +34,8 @@ defmodule IRCane.Commands.Join do
     with {:ok, channel_pid} <- do_join(channel_name, key, state),
          {:ok, {channel_name, topic}} <- Channel.topic(channel_pid),
          {:ok, {_channel_name, names}} <- Channel.names(channel_pid) do
-      channel_info = %{
-        name: channel_name,
-        monitor_ref: Process.monitor(channel_pid)
-      }
-
-      new_state = %{
-        state
-        | joined_channels: Map.put(state.joined_channels, channel_pid, channel_info)
-      }
+      new_state =
+        UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
 
       reply =
         if topic do

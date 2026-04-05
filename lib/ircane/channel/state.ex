@@ -3,8 +3,8 @@ defmodule IRCane.Channel.State do
   alias IRCane.Channel.Modes
   alias IRCane.Channel.Role
   alias IRCane.Channel.Topic
-  alias IRCane.Client
   alias IRCane.Protocol.Mode
+  alias IRCane.User.State, as: UserState
 
   defstruct name: nil,
             topic: nil,
@@ -40,7 +40,7 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec join(t(), Client.t(), reference(), String.t() | nil) ::
+  @spec join(t(), UserState.t(), reference(), String.t() | nil) ::
           {:ok, t()} | :noop | {:error, atom()}
   def join(channel_state, client, monitor_ref, key \\ nil) do
     if member?(channel_state, client.pid) do
@@ -65,12 +65,12 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec names(t(), Client.t()) :: {:ok, [Membership.t()]} | {:error, atom()}
+  @spec names(t(), UserState.t()) :: {:ok, [Membership.t()]} | {:error, atom()}
   def names(channel_state, _client) do
     {:ok, Map.values(channel_state.members)}
   end
 
-  @spec part(t(), Client.t()) :: {:ok, {t(), Membership.t()}} | {:error, atom()}
+  @spec part(t(), UserState.t()) :: {:ok, {t(), Membership.t()}} | {:error, atom()}
   def part(channel_state, client) do
     if member?(channel_state, client.pid) do
       {member, new_members} = Map.pop(channel_state.members, client.pid)
@@ -86,12 +86,12 @@ defmodule IRCane.Channel.State do
     {%{channel_state | members: new_members}, member}
   end
 
-  @spec topic(t(), Client.t()) :: {:ok, Topic.t()} | {:error, atom()}
+  @spec topic(t(), UserState.t()) :: {:ok, Topic.t()} | {:error, atom()}
   def topic(channel_state, _client) do
     {:ok, channel_state.topic}
   end
 
-  @spec update_topic(t(), Client.t(), String.t()) :: {:ok, t()} | {:error, atom()}
+  @spec update_topic(t(), UserState.t(), String.t()) :: {:ok, t()} | {:error, atom()}
   def update_topic(channel_state, client, new_topic) do
     with :ok <- Modes.authorize(channel_state, :update_topic, client) do
       topic = %Topic{topic: new_topic, set_by: client.nickname, set_at: DateTime.utc_now()}
@@ -99,7 +99,7 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec update_member_nickname(t(), Client.t()) :: t()
+  @spec update_member_nickname(t(), UserState.t()) :: t()
   def update_member_nickname(channel_state, client) do
     if member?(channel_state, client.pid) do
       members = Map.update!(channel_state.members, client.pid, &%{&1 | nickname: client.nickname})
@@ -109,13 +109,13 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec mode(t(), Client.t()) :: {:ok, [Mode.t()]} | {:error, atom()}
+  @spec mode(t(), UserState.t()) :: {:ok, [Mode.t()]} | {:error, atom()}
   def mode(channel_state, _client) do
     modes = Modes.current(channel_state)
     {:ok, modes}
   end
 
-  @spec update_mode(t(), Client.t(), [Mode.mode_change()]) ::
+  @spec update_mode(t(), UserState.t(), [Mode.mode_change()]) ::
           {:ok, {t(), [Mode.mode_change()], [atom()]}} | {:error, atom()}
   def update_mode(channel_state, client, mode_updates) do
     Modes.apply(channel_state, mode_updates, client)

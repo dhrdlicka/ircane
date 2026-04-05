@@ -3,12 +3,12 @@ defmodule IRCane.Channel.StateTest do
 
   alias IRCane.Channel.Modes
   alias IRCane.Channel.State, as: ChannelState
-  alias IRCane.Client
+  alias IRCane.User.State, as: UserState
 
   import Mimic
 
   setup do
-    client = %Client{
+    client = %UserState{
       pid: self(),
       nickname: "nick",
       username: "user",
@@ -122,7 +122,7 @@ defmodule IRCane.Channel.StateTest do
 
       {:ok, new_state} = ChannelState.join(state, client, make_ref())
 
-      other_client = %Client{
+      other_client = %UserState{
         pid: spawn(fn -> :ok end),
         nickname: "other",
         username: "other_user",

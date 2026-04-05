@@ -4,6 +4,7 @@ defmodule IRCane.Client do
   alias IRCane.Stats
   alias IRCane.UserRegistry
   alias IRCane.Replies
+  alias IRCane.User.State, as: UserState
   alias IRCane.Utils.ReverseDNSResolver
 
   require Logger
@@ -12,19 +13,10 @@ defmodule IRCane.Client do
 
   defstruct transport: nil,
             buffer: "",
-            pid: nil,
-            nickname: nil,
-            username: nil,
-            hostname: nil,
-            realname: nil,
             rdns_ref: nil,
-            registered?: false,
-            disconnecting?: false,
-            operator?: true,
-            away_message: nil,
-            quit_message: nil,
             seen_events: :queue.new(),
-            joined_channels: %{}
+            disconnecting?: false,
+            user: nil
 
   @type t :: any()
 
@@ -52,6 +44,7 @@ defmodule IRCane.Client do
     GenServer.start_link(__MODULE__, transport)
   end
 
+  @spec state(String.t() | GenServer.server()) :: {:ok, t()} | {:error, term()}
   def state(nickname) when is_binary(nickname) do
     state(via_tuple(nickname))
   catch
@@ -63,10 +56,7 @@ defmodule IRCane.Client do
     GenServer.call(pid, :state)
   end
 
-  def deliver(pid, ref, from, message) do
-    GenServer.cast(pid, {:deliver, ref, from, message})
-  end
-
+  @spec privmsg(String.t() | GenServer.server(), t(), String.t()) :: :ok | {:error, term()}
   def privmsg(nickname, client, message) when is_binary(nickname) do
     privmsg(via_tuple(nickname), client, message)
   catch
@@ -78,6 +68,7 @@ defmodule IRCane.Client do
     GenServer.call(pid, {:privmsg, client, message})
   end
 
+  @spec notice(String.t() | GenServer.server(), t(), String.t()) :: :ok | {:error, term()}
   def notice(nickname, client, message) when is_binary(nickname) do
     notice(via_tuple(nickname), client, message)
   catch
@@ -89,31 +80,65 @@ defmodule IRCane.Client do
     GenServer.cast(pid, {:notice, client, message})
   end
 
+  @spec deliver(GenServer.server(), reference(), t(), term()) :: :ok
+  def deliver(pid, ref, from, message) do
+    GenServer.cast(pid, {:deliver, ref, from, message})
+  end
+
+  @spec process_messages(GenServer.server(), [String.t()]) :: :ok
   def process_messages(pid, messages) do
     GenServer.cast(pid, {:process_messages, messages})
   end
 
+  @spec transport_error(GenServer.server(), term()) :: :ok
   def transport_error(pid, reason) do
     GenServer.cast(pid, {:transport_error, reason})
   end
 
-  @impl true
+  @impl GenServer
   def init(transport) do
-    {:ok, %__MODULE__{transport: transport, pid: self()}, {:continue, :init}}
+    {:ok, %__MODULE__{transport: transport, user: UserState.new(self())}, {:continue, :init}}
   end
 
-  @impl true
+  @impl GenServer
+  def terminate(reason, state) do
+    message = state.user.quit_message || "User process terminated unexpectedly"
+
+    state.user.channels
+    |> Map.keys()
+    |> Enum.each(&Channel.broadcast_quit(&1, state.user, message))
+
+    mask = "#{state.user.username || "unknown"}@#{state.user.hostname}"
+
+    send_message(state, {:error, "Closing link: (#{mask}) [#{message}]"})
+
+    case reason do
+      :normal ->
+        Logger.debug("Client #{state.user.nickname || mask} disconnected normally")
+
+      _ ->
+        Logger.error(
+          "Client #{state.user.nickname || mask} terminated abnormally: #{inspect(reason)}"
+        )
+    end
+
+    if state.user.registered? do
+      Stats.user_quit()
+    end
+  end
+
+  @impl GenServer
   def handle_call(:state, _from, state) do
     {:reply, {:ok, state}, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_call({:privmsg, source, message}, _from, state) do
-    send_message(state, {:privmsg, source, state.nickname, message})
+    send_message(state, {:privmsg, source, state.user.nickname, message})
     {:reply, :ok, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_cast({:deliver, ref, _from, message}, state) do
     if received_event?(state, ref) do
       {:noreply, state}
@@ -127,13 +152,11 @@ defmodule IRCane.Client do
     end
   end
 
-  @impl true
   def handle_cast({:notice, source, message}, state) do
-    send_message(state, {:notice, source, state.nickname, message})
+    send_message(state, {:notice, source, state.user.nickname, message})
     {:noreply, state}
   end
 
-  @impl true
   def handle_cast({:process_messages, messages}, state) do
     new_state = Enum.reduce(messages, state, &handle_line/2)
 
@@ -144,12 +167,16 @@ defmodule IRCane.Client do
     end
   end
 
-  @impl true
   def handle_cast({:transport_error, reason}, state) do
-    {:stop, :normal, %{state | disconnecting?: true, quit_message: inspect(reason)}}
+    {:stop, :normal,
+     %{
+       state
+       | disconnecting?: true,
+         user: UserState.quit(state.user, "Transport error: #{reason}")
+     }}
   end
 
-  @impl true
+  @impl GenServer
   def handle_continue(:init, %{transport: {mod, ref}} = state) do
     %{hostname: hostname} = mod.finish_handshake(ref)
 
@@ -160,10 +187,11 @@ defmodule IRCane.Client do
         ReverseDNSResolver.resolve(hostname)
       end)
 
-    {:noreply, %{state | hostname: hostname, rdns_ref: rdns_ref}}
+    {:noreply,
+     %{state | user: UserState.update_hostname(state.user, hostname), rdns_ref: rdns_ref}}
   end
 
-  @impl true
+  @impl GenServer
   def handle_info({ref, result}, %{rdns_ref: ref} = state) do
     Process.demonitor(ref, [:flush])
 
@@ -171,65 +199,40 @@ defmodule IRCane.Client do
       case result do
         {:ok, resolved_hostname} ->
           Logger.debug(
-            "Reverse DNS lookup successful for #{state.hostname}: #{resolved_hostname}"
+            "Reverse DNS lookup successful for #{state.user.hostname}: #{resolved_hostname}"
           )
 
           send_message(
-            %{state | hostname: resolved_hostname},
+            %{state | user: UserState.update_hostname(state.user, resolved_hostname)},
             {:found_hostname, resolved_hostname}
           )
 
         {:error, reason} ->
-          Logger.warning("Reverse DNS lookup failed for #{state.hostname}: #{inspect(reason)}")
-          send_message(state, {:could_not_resolve_hostname, state.hostname})
+          Logger.warning(
+            "Reverse DNS lookup failed for #{state.user.hostname}: #{inspect(reason)}"
+          )
+
+          send_message(state, {:could_not_resolve_hostname, state.user.hostname})
       end
 
     {:noreply, maybe_register(%{new_state | rdns_ref: nil})}
   end
 
-  @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{rdns_ref: ref} = state) do
-    Logger.warning("Reverse DNS task crashed for #{state.hostname}: #{inspect(reason)}")
-    send_message(state, {:reverse_lookup_failed, state.hostname})
+    Logger.warning("Reverse DNS task crashed for #{state.user.hostname}: #{inspect(reason)}")
+    send_message(state, {:reverse_lookup_failed, state.user.hostname})
     {:noreply, maybe_register(%{state | rdns_ref: nil})}
   end
 
-  @impl true
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     {channel_info, joined_channels} = Map.pop(state.joined_channels, pid)
 
     if channel_info do
-      send_message(state, {:kick, :server, channel_info.name, state.nickname})
+      send_message(state, {:kick, :server, channel_info.name, state.user.nickname})
 
       {:noreply, %{state | joined_channels: joined_channels}}
     else
       {:noreply, state}
-    end
-  end
-
-  @impl true
-  def terminate(reason, state) do
-    identifier = state.nickname || state.hostname || "unknown"
-    message = state.quit_message || "User process terminated unexpectedly"
-
-    state.joined_channels
-    |> Map.keys()
-    |> Enum.each(&Channel.broadcast_quit(&1, state, message))
-
-    mask = "#{state.username || "unknown"}@#{state.hostname}"
-
-    send_message(state, {:error, "Closing link: (#{mask}) [#{message}]"})
-
-    case reason do
-      :normal ->
-        Logger.debug("Client #{identifier} disconnected normally")
-
-      _ ->
-        Logger.error("Client #{identifier} terminated abnormally: #{inspect(reason)}")
-    end
-
-    if state.registered? do
-      Stats.user_unregistered()
     end
   end
 
@@ -241,24 +244,27 @@ defmodule IRCane.Client do
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
     Logger.warning(
-      "Line too long from #{state.nickname || state.hostname || "unknown"}: #{byte_size(line)} bytes"
+      "Line too long from #{state.user.nickname || state.user.hostname || "unknown"}: #{byte_size(line)} bytes"
     )
 
     send_message(state, :input_too_long)
   end
 
   defp handle_line(line, state) do
-    Logger.debug("[#{state.nickname || state.hostname || "unknown"}] << #{String.trim(line)}")
+    Logger.debug(
+      "[#{state.user.nickname || state.user.hostname || "unknown"}] << #{String.trim(line)}"
+    )
 
     case Message.parse(line) do
       {:ok, %{command: command, params: params}} ->
         command
         |> handle_command(params, state)
         |> maybe_register()
+        |> update_disconnecting()
 
       {:error, reason} ->
         Logger.debug(
-          "Failed to parse message from #{state.nickname || state.hostname || "unknown"}: #{inspect(reason)}"
+          "Failed to parse message from #{state.user.nickname || state.user.hostname || "unknown"}: #{inspect(reason)}"
         )
 
         state
@@ -266,60 +272,71 @@ defmodule IRCane.Client do
   end
 
   defp handle_command(command, params, state) do
-    case command |> String.upcase() |> run_command(params, state) do
+    case command |> String.upcase() |> run_command(params, state.user) do
       {:ok, new_state} ->
-        new_state
+        %{state | user: new_state}
 
       {:ok, result, new_state} ->
-        send_message(new_state, result)
+        send_message(%{state | user: new_state}, result)
 
       {:error, error} ->
         send_message(state, error)
     end
   end
 
-  defp run_command(command, _params, %{registered?: false} = _state)
+  defp run_command(command, _params, %{registered?: false} = _user_state)
        when command not in @unregistered_commands do
     {:error, :not_registered}
   end
 
-  defp run_command(command, params, state) do
+  defp run_command(command, params, user_state) do
     case Map.get(@command_handlers, command) do
       nil ->
         Logger.debug(
-          "Unknown command from #{state.nickname || state.hostname || "unknown"}: #{command}"
+          "Unknown command from #{user_state.nickname || user_state.hostname || "unknown"}: #{command}"
         )
 
         {:error, {:unknown_command, command}}
 
       handler ->
-        handler.handle(params, state)
+        handler.handle(params, user_state)
     end
   end
 
   defp cmd(state, command, params), do: handle_command(command, params, state)
 
-  defp maybe_register(
-         %{registered?: false, nickname: nick, username: user, rdns_ref: nil} = state
-       )
-       when not is_nil(nick) and not is_nil(user) do
-    Logger.notice("User registered: #{nick}!#{user}@#{state.hostname}")
+  defp maybe_register(%{transport: {mod, ref}, rdns_ref: nil, user: user} = state) do
+    case UserState.try_register(user) do
+      {:ok, new_state} ->
+        Logger.notice(
+          "User registered: #{new_state.nickname}!#{new_state.username}@#{new_state.hostname}"
+        )
 
-    Stats.user_registered()
+        Stats.user_registered()
 
-    %{state | registered?: true}
-    |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
-    |> cmd("LUSERS", [])
-    |> cmd("MOTD", [])
+        mod.update_user_info(ref, username: new_state.username)
+
+        %{state | user: new_state}
+        |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
+        |> cmd("LUSERS", [])
+        |> cmd("MOTD", [])
+
+      :noop ->
+        state
+    end
   end
 
   defp maybe_register(state) do
     state
   end
 
+  defp update_disconnecting(state) do
+    %{state | disconnecting?: not is_nil(state.user.quit_message)}
+  end
+
   defp send_message(state, message) do
     message
-    |> Replies.format_message(state.nickname)
+    |> Replies.format_message(state.user.nickname)
     |> Enum.each(&do_send_message(&1, state))
 
     state
@@ -330,7 +347,7 @@ defmodule IRCane.Client do
     mod.send_message(ref, raw_message)
 
     Logger.debug(
-      "[#{state.nickname || state.hostname || "unknown"}] >> #{String.trim(raw_message)}"
+      "[#{state.user.nickname || state.user.hostname || "unknown"}] >> #{String.trim(raw_message)}"
     )
 
     :ok

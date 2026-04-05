@@ -1,10 +1,10 @@
 defmodule IRCane.Channel.Modes do
   alias IRCane.BanMask
   alias IRCane.Channel.State, as: ChannelState
-  alias IRCane.Client
   alias IRCane.Protocol.Mode
+  alias IRCane.User.State, as: UserState
 
-  @spec authorize(ChannelState.t(), atom(), Client.t(), keyword()) :: :ok | {:error, atom()}
+  @spec authorize(ChannelState.t(), atom(), UserState.t(), keyword()) :: :ok | {:error, atom()}
   def authorize(channel_state, action, client, opts \\ [])
 
   def authorize(channel_state, :join, client, opts) do
@@ -130,7 +130,7 @@ defmodule IRCane.Channel.Modes do
   defp enforce_no_external_messages(channel_state, client_pid),
     do: ensure_member(channel_state, client_pid)
 
-  @spec apply(ChannelState.t(), [Mode.mode_change()], Client.t()) ::
+  @spec apply(ChannelState.t(), [Mode.mode_change()], UserState.t()) ::
           {:ok, {ChannelState.t(), [Mode.mode_change()], [atom()]}} | {:error, atom()}
   def apply(channel_state, updates, client) do
     result =
