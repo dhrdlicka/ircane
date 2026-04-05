@@ -6,6 +6,7 @@ defmodule IRCane.Transport.TCP do
   alias IRCane.Client
   alias IRCane.ClientSupervisor
   alias IRCane.Replies
+  alias IRCane.Stats
 
   @max_buffer_size 8_192
 
@@ -71,6 +72,7 @@ defmodule IRCane.Transport.TCP do
       end
 
     Process.monitor(client_pid)
+    Stats.connection_opened()
 
     {:continue,
      %{
@@ -108,12 +110,14 @@ defmodule IRCane.Transport.TCP do
   @impl ThousandIsland.Handler
   def handle_close(_socket, state) do
     Logger.debug("TCP connection closed for #{state.hostname}")
+    Stats.connection_closed()
     Client.transport_error(state.client_pid, :connection_closed)
   end
 
   @impl ThousandIsland.Handler
   def handle_error(reason, _socket, state) do
     Logger.error("TCP error for #{state.hostname}: #{inspect(reason)}")
+    Stats.connection_closed()
     Client.transport_error(state.client_pid, reason)
   end
 

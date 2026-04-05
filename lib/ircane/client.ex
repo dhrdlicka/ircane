@@ -1,6 +1,7 @@
 defmodule IRCane.Client do
   alias IRCane.Channel
   alias IRCane.Protocol.Message
+  alias IRCane.Stats
   alias IRCane.UserRegistry
   alias IRCane.Replies
   alias IRCane.Utils.ReverseDNSResolver
@@ -226,6 +227,10 @@ defmodule IRCane.Client do
       _ ->
         Logger.error("Client #{identifier} terminated abnormally: #{inspect(reason)}")
     end
+
+    if state.registered? do
+      Stats.user_unregistered()
+    end
   end
 
   defp via_tuple(nickname) do
@@ -299,6 +304,8 @@ defmodule IRCane.Client do
        )
        when not is_nil(nick) and not is_nil(user) do
     Logger.notice("User registered: #{nick}!#{user}@#{state.hostname}")
+
+    Stats.user_registered()
 
     %{state | registered?: true}
     |> send_message([:welcome, :your_host, :created, :my_info, :i_support])

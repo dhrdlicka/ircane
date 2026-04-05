@@ -2,13 +2,12 @@ defmodule IRCane.Replies do
   alias IRCane.Channel.Role
   alias IRCane.Protocol.Message
   alias IRCane.Protocol.Mode
+  alias IRCane.Stats
   alias IRCane.Utils.ISupport
 
   @network_name "TestNet"
   @server_name "localhost"
   @version "ircane-0.1"
-  @created_date DateTime.utc_now()
-
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   defp format_numeric(reply, client) do
@@ -30,10 +29,12 @@ defmodule IRCane.Replies do
         }
 
       :created ->
+        created_date = Stats.created_at()
+
         %Message{
           source: @server_name,
           command: "003",
-          params: [client, "This server was created #{@created_date}"]
+          params: [client, "This server was created #{created_date}"]
         }
 
       :my_info ->

@@ -6,6 +6,7 @@ defmodule IRCane.Channel do
   alias IRCane.ChannelRegistry
   alias IRCane.Client
   alias IRCane.Protocol.Mode
+  alias IRCane.Stats
 
   require Logger
 
@@ -163,9 +164,20 @@ defmodule IRCane.Channel do
   def init(opts) do
     channel_name = Keyword.fetch!(opts, :name)
 
-    Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ -> channel_name end)
+    with {:ok, _state} = result <- ChannelState.new(channel_name) do
+      Stats.channel_created()
+      Logger.info("Channel #{channel_name} process started")
 
-    ChannelState.new(channel_name)
+      Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ -> channel_name end)
+
+      result
+    end
+  end
+
+  @impl true
+  def terminate(_reason, state) do
+    Stats.channel_destroyed()
+    Logger.notice("Channel #{state.name} process terminated")
   end
 
   @impl true
@@ -368,7 +380,6 @@ defmodule IRCane.Channel do
 
   defp terminate_if_empty(state) do
     if ChannelState.empty?(state) do
-      Logger.notice("Channel #{state.name} shut down after last user left")
       {:stop, :normal, state}
     else
       {:noreply, state}

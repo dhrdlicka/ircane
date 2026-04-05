@@ -1,23 +1,17 @@
 defmodule IRCane.Commands.Lusers do
-  alias IRCane.ChannelRegistry
-  alias IRCane.ClientSupervisor
-  alias IRCane.UserRegistry
+  alias IRCane.Stats
 
   def handle(_params, state) do
-    %{active: connections} =
-      DynamicSupervisor.count_children(ClientSupervisor)
-
-    users = Registry.count(UserRegistry)
-    channels = Registry.count(ChannelRegistry)
+    stats = Stats.snapshot()
 
     reply = %{
-      users: users,
+      users: stats.current_users,
       invisible: 0,
       servers: 1,
       operators: 0,
-      unknown: connections - users,
-      channels: channels,
-      max_users: users
+      unknown: stats.current_connections - stats.current_users,
+      channels: stats.current_channels,
+      max_users: stats.peak_users
     }
 
     {:ok, {:lusers, reply}, state}
