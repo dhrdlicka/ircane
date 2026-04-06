@@ -16,14 +16,14 @@ defmodule IRCane.Commands.Join do
         {:ok, new_state} ->
           {replies, new_state}
 
-        {:ok, reply, new_state} ->
-          {[reply | replies], new_state}
+        {:ok, new_replies, new_state} ->
+          {new_replies ++ replies, new_state}
 
         {:error, reason} ->
           {[reason | replies], current_state}
       end
     end)
-    |> then(fn {replies, final_state} -> {:ok, replies, final_state} end)
+    |> then(fn {replies, final_state} -> {:ok, replies |> IO.inspect(), final_state} end)
   end
 
   def handle(_, _state) do
@@ -42,12 +42,12 @@ defmodule IRCane.Commands.Join do
           [
             {:join, state, channel_name},
             {:topic, channel_name, topic},
-            {:names, channel_name, names}
+            {:names, channel_name, :public, names}
           ]
         else
           [
             {:join, state, channel_name},
-            {:names, channel_name, names}
+            {:names, channel_name, :public, names}
           ]
         end
 

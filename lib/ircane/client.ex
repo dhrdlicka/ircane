@@ -216,7 +216,11 @@ defmodule IRCane.Client do
         {:noreply, state}
 
       {%{name: channel_name}, updated_user} ->
-        send_message(state, {:kick, :server, channel_name, state.user.nickname, "Channel process terminated"})
+        send_message(
+          state,
+          {:kick, :server, channel_name, state.user.nickname, "Channel process terminated"}
+        )
+
         {:noreply, %{state | user: updated_user}}
     end
   end
@@ -310,7 +314,9 @@ defmodule IRCane.Client do
 
   defp send_message(state, message) do
     message
-    |> Replies.format_message(state.user.nickname)
+    |> List.wrap()
+    |> Enum.map(&Replies.format(&1, state.user))
+    |> List.flatten()
     |> Enum.each(&do_send_message(&1, state))
 
     state
@@ -328,10 +334,16 @@ defmodule IRCane.Client do
   defp finish_rdns(state, result) do
     case result do
       {:ok, resolved_hostname} ->
-        Logger.debug("Reverse DNS lookup successful for #{client_id(state)}: #{resolved_hostname}")
+        Logger.debug(
+          "Reverse DNS lookup successful for #{client_id(state)}: #{resolved_hostname}"
+        )
 
         updated_user = UserState.update_hostname(state.user, resolved_hostname)
-        send_message(%{state | rdns_ref: nil, user: updated_user}, {:rdns_successful, resolved_hostname})
+
+        send_message(
+          %{state | rdns_ref: nil, user: updated_user},
+          {:rdns_successful, resolved_hostname}
+        )
 
       {:error, reason} ->
         Logger.warning("Reverse DNS lookup failed for #{client_id(state)}: #{inspect(reason)}")
@@ -363,6 +375,6 @@ defmodule IRCane.Client do
   defp host_mask(%{user: user}), do: host_mask(user)
 
   defp host_mask(user) do
-    "#{user.username || "unknown"}@#{user.hostname || "unknown"}}"
+    "#{user.username || "unknown"}@#{user.hostname || "unknown"}"
   end
 end

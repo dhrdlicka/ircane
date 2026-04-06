@@ -125,7 +125,8 @@ defmodule IRCane.Transport.TCP do
     mask = "#{state.username || "unknown"}@#{state.hostname}"
 
     {:error, "Closing link: (#{mask}) [#{reason}]"}
-    |> Replies.format_message()
+    |> Replies.format(%{})
+    |> List.wrap()
     |> Enum.each(&ThousandIsland.Socket.send(socket, &1))
   end
 end

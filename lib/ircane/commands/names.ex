@@ -18,10 +18,10 @@ defmodule IRCane.Commands.Names do
   defp fetch_names(channel_name) do
     case Channel.names(channel_name) do
       {:ok, {channel_name, names}} ->
-        {:names, channel_name, names}
+        {:names, channel_name, :public, names}
 
       _ ->
-        {:names, channel_name, []}
+        {:names, channel_name, :public, []}
     end
   end
 end
