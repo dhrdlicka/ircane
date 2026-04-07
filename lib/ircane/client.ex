@@ -2,10 +2,10 @@ defmodule IRCane.Client do
   @moduledoc false
   alias IRCane.Channel
   alias IRCane.Protocol.Message
-  alias IRCane.Stats
-  alias IRCane.UserRegistry
   alias IRCane.Replies
+  alias IRCane.Stats
   alias IRCane.User.State, as: UserState
+  alias IRCane.UserRegistry
   alias IRCane.Utils.ReverseDNSResolver
 
   require Logger

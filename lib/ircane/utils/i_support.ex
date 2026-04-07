@@ -4,7 +4,7 @@ defmodule IRCane.Utils.ISupport do
   @roles Application.compile_env(:ircane, :roles)
   @network_name Application.compile_env(:ircane, :network_name)
 
-  def build_chanmodes() do
+  def build_chanmodes do
     %{type_a: modes_a, type_b: modes_b, type_c: modes_c, type_d: modes_d} =
       @channel_modes
       |> Enum.group_by(fn {_letter, {type, name, opts}} ->
@@ -25,7 +25,7 @@ defmodule IRCane.Utils.ISupport do
     )
   end
 
-  def build_prefix() do
+  def build_prefix do
     {modes, prefixes} =
       @roles
       |> Enum.reverse()
@@ -44,7 +44,7 @@ defmodule IRCane.Utils.ISupport do
     "(#{modes})#{prefixes}"
   end
 
-  def build() do
+  def build do
     %{
       casemapping: "ascii",
       chanmodes: build_chanmodes(),

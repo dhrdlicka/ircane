@@ -1,7 +1,7 @@
 defmodule IRCane.Commands.Mode do
   @moduledoc false
-  alias IRCane.Protocol.Mode
   alias IRCane.Channel
+  alias IRCane.Protocol.Mode
 
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
