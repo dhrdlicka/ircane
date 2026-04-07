@@ -200,7 +200,7 @@ defmodule IRCane.Replies.Numerics do
   defp numeric(number, client, nil, params) do
     %Message{
       source: @server_name,
-      command: to_string(number),
+      command: number |> to_string() |> String.pad_leading(3, "0"),
       params: [client.nickname || "*" | params]
     }
   end
@@ -208,7 +208,7 @@ defmodule IRCane.Replies.Numerics do
   defp numeric(number, client, message, params) do
     %Message{
       source: @server_name,
-      command: to_string(number),
+      command: number |> to_string() |> String.pad_leading(3, "0"),
       params: [client.nickname || "*" | params] ++ [message]
     }
   end
