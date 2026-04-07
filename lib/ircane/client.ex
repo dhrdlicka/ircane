@@ -15,7 +15,6 @@ defmodule IRCane.Client do
             buffer: "",
             rdns_ref: nil,
             seen_events: :queue.new(),
-            disconnecting?: false,
             user: nil
 
   @type t :: any()
@@ -155,7 +154,7 @@ defmodule IRCane.Client do
   def handle_cast({:process_messages, messages}, state) do
     new_state = Enum.reduce(messages, state, &handle_line/2)
 
-    if new_state.disconnecting? do
+    if new_state.user.quit_message do
       {:stop, :normal, new_state}
     else
       {:noreply, new_state}
@@ -164,11 +163,7 @@ defmodule IRCane.Client do
 
   def handle_cast({:transport_error, reason}, state) do
     {:stop, :normal,
-     %{
-       state
-       | disconnecting?: true,
-         user: UserState.quit(state.user, "Transport error: #{reason}")
-     }}
+     %{state | user: UserState.quit(state.user, "Transport error: #{reason}")}}
   end
 
   @impl GenServer
@@ -229,7 +224,8 @@ defmodule IRCane.Client do
     {:via, Registry, {UserRegistry, String.downcase(nickname)}}
   end
 
-  defp handle_line(_line, %{disconnecting?: true} = state), do: state
+  defp handle_line(_line, %{user: %{quit_message: message}} = state)
+    when not is_nil(message), do: state
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
     Logger.warning("Line too long from #{client_id(state)}: #{byte_size(line)} bytes")
@@ -244,7 +240,6 @@ defmodule IRCane.Client do
         command
         |> handle_command(params, state)
         |> maybe_register()
-        |> update_disconnecting()
 
       {:error, reason} ->
         Logger.debug("Failed to parse message from #{client_id(state)}: #{inspect(reason)}")
@@ -306,10 +301,6 @@ defmodule IRCane.Client do
 
   defp maybe_register(state) do
     state
-  end
-
-  defp update_disconnecting(state) do
-    %{state | disconnecting?: not is_nil(state.user.quit_message)}
   end
 
   defp send_message(state, message) do
