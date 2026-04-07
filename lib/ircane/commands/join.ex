@@ -23,7 +23,7 @@ defmodule IRCane.Commands.Join do
           {[reason | replies], current_state}
       end
     end)
-    |> then(fn {replies, final_state} -> {:ok, replies |> IO.inspect(), final_state} end)
+    |> then(fn {replies, final_state} -> {:ok, replies, final_state} end)
   end
 
   def handle(_, _state) do
