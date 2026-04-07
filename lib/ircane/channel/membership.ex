@@ -1,4 +1,5 @@
 defmodule IRCane.Channel.Membership do
+  @moduledoc false
   alias IRCane.Channel.Role
 
   @enforce_keys [:nickname, :username, :hostname, :monitor_ref]

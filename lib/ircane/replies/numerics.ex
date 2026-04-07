@@ -1,4 +1,5 @@
 defmodule IRCane.Replies.Numerics do
+  @moduledoc false
   alias IRCane.BanMask
   alias IRCane.Channel.Role
   alias IRCane.Protocol.Message

@@ -1,4 +1,5 @@
 defmodule IRCane.Channel.State do
+  @moduledoc false
   alias IRCane.Channel.Membership
   alias IRCane.Channel.Modes
   alias IRCane.Channel.Role

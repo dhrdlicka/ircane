@@ -1,4 +1,5 @@
 defmodule IRCane.Transport.TCP do
+  @moduledoc false
   use ThousandIsland.Handler
 
   require Logger

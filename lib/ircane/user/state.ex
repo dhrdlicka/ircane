@@ -1,4 +1,5 @@
 defmodule IRCane.User.State do
+  @moduledoc false
   alias IRCane.User.ChannelMembership
 
   @enforce_keys [:pid]

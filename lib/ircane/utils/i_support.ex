@@ -1,4 +1,5 @@
 defmodule IRCane.Utils.ISupport do
+  @moduledoc false
   @channel_modes Application.compile_env(:ircane, :channel_modes)
   @roles Application.compile_env(:ircane, :roles)
   @network_name Application.compile_env(:ircane, :network_name)

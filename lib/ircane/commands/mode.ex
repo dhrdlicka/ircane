@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Mode do
+  @moduledoc false
   alias IRCane.Protocol.Mode
   alias IRCane.Channel
 

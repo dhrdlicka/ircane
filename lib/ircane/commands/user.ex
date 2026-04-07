@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.User do
+  @moduledoc false
   alias IRCane.User.State, as: UserState
   require Logger
 

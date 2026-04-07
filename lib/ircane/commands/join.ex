@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Join do
+  @moduledoc false
   alias IRCane.Channel
   alias IRCane.ChannelSupervisor
   alias IRCane.User.State, as: UserState

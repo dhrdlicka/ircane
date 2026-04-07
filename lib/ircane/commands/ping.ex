@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Ping do
+  @moduledoc false
   def handle([token | _], state) do
     {:ok, {:pong, token}, state}
   end

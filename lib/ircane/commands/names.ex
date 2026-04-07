@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Names do
+  @moduledoc false
   alias IRCane.Channel
 
   def handle([channels | _], state) do

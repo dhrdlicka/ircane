@@ -1,4 +1,5 @@
 defmodule IRCane.Replies.Notices do
+  @moduledoc false
   alias IRCane.Protocol.Message
 
   @server_name Application.compile_env(:ircane, :server_name)

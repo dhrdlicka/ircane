@@ -1,4 +1,5 @@
 defmodule IRCane.Client do
+  @moduledoc false
   alias IRCane.Channel
   alias IRCane.Protocol.Message
   alias IRCane.Stats

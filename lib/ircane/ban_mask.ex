@@ -1,4 +1,5 @@
 defmodule IRCane.BanMask do
+  @moduledoc false
   alias IRCane.Utils.Glob
 
   def parse(mask) do

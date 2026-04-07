@@ -1,4 +1,8 @@
 defmodule IRCane.Utils.Glob do
+  @moduledoc """
+  Implements IRC-style glob pattern matching
+  """
+
   def match?(pattern, string) do
     do_match(String.to_charlist(pattern), String.to_charlist(string), nil)
   end

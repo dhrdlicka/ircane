@@ -1,4 +1,5 @@
 defmodule IRCane.Replies do
+  @moduledoc false
   alias IRCane.Channel.Topic
   alias IRCane.Protocol.Message
   alias IRCane.Protocol.Mode

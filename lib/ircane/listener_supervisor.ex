@@ -1,4 +1,5 @@
 defmodule IRCane.ListenerSupervisor do
+  @moduledoc false
   use Supervisor
 
   def start_link(arg) do

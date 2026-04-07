@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Topic do
+  @moduledoc false
   alias IRCane.Channel
 
   require Logger

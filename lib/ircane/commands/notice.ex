@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Notice do
+  @moduledoc false
   alias IRCane.Channel
   alias IRCane.Client
 

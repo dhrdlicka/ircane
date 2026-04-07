@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Nick do
+  @moduledoc false
   alias IRCane.Channel
   alias IRCane.User.State, as: UserState
 

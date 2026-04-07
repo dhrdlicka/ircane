@@ -1,4 +1,5 @@
 defmodule IRCane.Protocol.Message do
+  @moduledoc false
   defstruct source: nil,
             command: nil,
             params: []

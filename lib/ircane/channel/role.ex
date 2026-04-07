@@ -1,4 +1,5 @@
 defmodule IRCane.Channel.Role do
+  @moduledoc false
   @type t :: atom()
 
   @roles Application.compile_env!(:ircane, :roles)

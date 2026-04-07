@@ -1,4 +1,5 @@
 defmodule IRCane.Protocol.Mode do
+  @moduledoc false
   @type t :: atom | {atom, term}
 
   @type mode_map :: %{

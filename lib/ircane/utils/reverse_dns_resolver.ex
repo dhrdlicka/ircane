@@ -1,4 +1,5 @@
 defmodule IRCane.Utils.ReverseDNSResolver do
+  @moduledoc false
   require Logger
 
   def resolve(address) do

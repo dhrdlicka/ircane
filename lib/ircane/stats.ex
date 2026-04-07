@@ -1,4 +1,5 @@
 defmodule IRCane.Stats do
+  @moduledoc false
   use GenServer
 
   @type snapshot :: %{

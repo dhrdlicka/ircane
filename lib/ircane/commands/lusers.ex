@@ -1,4 +1,5 @@
 defmodule IRCane.Commands.Lusers do
+  @moduledoc false
   alias IRCane.Stats
 
   def handle(_params, state) do

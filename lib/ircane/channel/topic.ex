@@ -1,4 +1,5 @@
 defmodule IRCane.Channel.Topic do
+  @moduledoc false
   defstruct topic: nil,
             set_by: nil,
             set_at: nil

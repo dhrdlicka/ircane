@@ -1,8 +1,11 @@
 defmodule IRCane.Channel.Modes do
+  @moduledoc false
   alias IRCane.BanMask
   alias IRCane.Channel.State, as: ChannelState
   alias IRCane.Protocol.Mode
   alias IRCane.User.State, as: UserState
+
+  require Logger
 
   @spec authorize(ChannelState.t(), atom(), UserState.t(), keyword()) :: :ok | {:error, atom()}
   def authorize(channel_state, action, client, opts \\ [])
@@ -14,6 +17,7 @@ defmodule IRCane.Channel.Modes do
          :ok <- enforce_channel_limit(channel_state),
          :ok <- enforce_key(channel_state, key),
          :ok <- enforce_invite_only_on_join(channel_state, client.pid) do
+      Logger.debug("Authorized #{client.nickname} to perform join on #{channel_state.name}")
       :ok
     end
   end
@@ -22,6 +26,7 @@ defmodule IRCane.Channel.Modes do
     with :ok <- enforce_no_external_messages(channel_state, client.pid),
          :ok <- enforce_moderated(channel_state, client.pid),
          :ok <- enforce_ban_on_speak(channel_state, client) do
+      Logger.debug("Authorized #{client.nickname} to perform speak on #{channel_state.name}")
       :ok
     end
   end
@@ -29,6 +34,10 @@ defmodule IRCane.Channel.Modes do
   def authorize(channel_state, :update_topic, client, _opts) do
     with :ok <- ensure_member(channel_state, client.pid),
          :ok <- enforce_protected_topic(channel_state, client.pid) do
+      Logger.debug(
+        "Authorized #{client.nickname} to perform update_topic on #{channel_state.name}"
+      )
+
       :ok
     end
   end
@@ -36,6 +45,10 @@ defmodule IRCane.Channel.Modes do
   def authorize(channel_state, :update_mode, client, _opts) do
     with :ok <- ensure_member(channel_state, client.pid),
          :ok <- ensure_operator(channel_state, client.pid) do
+      Logger.debug(
+        "Authorized #{client.nickname} to perform update_mode on #{channel_state.name}"
+      )
+
       :ok
     end
   end
@@ -43,6 +56,7 @@ defmodule IRCane.Channel.Modes do
   def authorize(channel_state, :kick, client, _opts) do
     with :ok <- ensure_member(channel_state, client.pid),
          :ok <- ensure_operator(channel_state, client.pid) do
+      Logger.debug("Authorized #{client.nickname} to perform kick on #{channel_state.name}")
       :ok
     end
   end
@@ -50,6 +64,7 @@ defmodule IRCane.Channel.Modes do
   def authorize(channel_state, :invite, client, _opts) do
     with :ok <- ensure_member(channel_state, client.pid),
          :ok <- enforce_invite_only_on_invite(channel_state, client.pid) do
+      Logger.debug("Authorized #{client.nickname} to perform invite on #{channel_state.name}")
       :ok
     end
   end
