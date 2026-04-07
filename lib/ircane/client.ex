@@ -162,8 +162,7 @@ defmodule IRCane.Client do
   end
 
   def handle_cast({:transport_error, reason}, state) do
-    {:stop, :normal,
-     %{state | user: UserState.quit(state.user, "Transport error: #{reason}")}}
+    {:stop, :normal, %{state | user: UserState.quit(state.user, "Transport error: #{reason}")}}
   end
 
   @impl GenServer
@@ -225,7 +224,7 @@ defmodule IRCane.Client do
   end
 
   defp handle_line(_line, %{user: %{quit_message: message}} = state)
-    when not is_nil(message), do: state
+       when not is_nil(message), do: state
 
   defp handle_line(line, state) when byte_size(line) > @max_line do
     Logger.warning("Line too long from #{client_id(state)}: #{byte_size(line)} bytes")

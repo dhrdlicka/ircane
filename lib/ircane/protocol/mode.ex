@@ -75,7 +75,7 @@ defmodule IRCane.Protocol.Mode do
     Enum.map(modes, fn
       {op, {name, arg}} when op in [:add, :remove] ->
         {_letter, _type, opts} = known_modes[name]
-        parse_fn = opts[:parse] || &({:ok, &1})
+        parse_fn = opts[:parse] || (&{:ok, &1})
 
         case parse_fn.(arg) do
           {:ok, parsed} -> {op, {name, parsed}}

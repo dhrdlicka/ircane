@@ -17,7 +17,11 @@ defmodule IRCane.Utils.ISupport do
       end)
       |> Map.new()
 
-    Enum.map_join([modes_a, modes_b, modes_c, modes_d], ",", &Enum.map(&1, fn {letter, {_type, _name, _opts}} -> letter end))
+    Enum.map_join(
+      [modes_a, modes_b, modes_c, modes_d],
+      ",",
+      &Enum.map(&1, fn {letter, {_type, _name, _opts}} -> letter end)
+    )
   end
 
   def build_prefix() do

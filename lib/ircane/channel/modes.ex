@@ -203,7 +203,11 @@ defmodule IRCane.Channel.Modes do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :key, new_key)}}
   end
 
-  defp do_apply_mode(%{modes: %{key: correct_key}} = channel_state, {:remove, {:key, key}}, _client)
+  defp do_apply_mode(
+         %{modes: %{key: correct_key}} = channel_state,
+         {:remove, {:key, key}},
+         _client
+       )
        when key == correct_key do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :key, nil)}}
   end
@@ -217,7 +221,11 @@ defmodule IRCane.Channel.Modes do
     end
   end
 
-  defp do_apply_mode(%{modes: %{bans: bans}} = channel_state, {:remove, {:ban, ban_mask}}, _client) do
+  defp do_apply_mode(
+         %{modes: %{bans: bans}} = channel_state,
+         {:remove, {:ban, ban_mask}},
+         _client
+       ) do
     if MapSet.member?(bans, ban_mask) do
       new_bans = MapSet.delete(bans, ban_mask)
       {:ok, %{channel_state | modes: Map.put(channel_state.modes, :bans, new_bans)}}

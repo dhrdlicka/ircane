@@ -37,7 +37,13 @@ defmodule IRCane.Replies.Numerics do
       |> Enum.map(fn {letter, _} -> letter end)
       |> to_string()
 
-    numeric(004, client, nil, [@server_name, @version, user_modes, channel_modes, channel_modes_with_params])
+    numeric(004, client, nil, [
+      @server_name,
+      @version,
+      user_modes,
+      channel_modes,
+      channel_modes_with_params
+    ])
   end
 
   def format({:i_support, features}, client) do
