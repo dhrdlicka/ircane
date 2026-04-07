@@ -17,9 +17,7 @@ defmodule IRCane.Utils.ISupport do
       end)
       |> Map.new()
 
-    [modes_a, modes_b, modes_c, modes_d]
-    |> Enum.map(&Enum.map(&1, fn {letter, {_type, _name, _opts}} -> letter end))
-    |> Enum.join(",")
+    Enum.map_join([modes_a, modes_b, modes_c, modes_d], ",", &Enum.map(&1, fn {letter, {_type, _name, _opts}} -> letter end))
   end
 
   def build_prefix() do
@@ -28,8 +26,9 @@ defmodule IRCane.Utils.ISupport do
       |> Enum.reverse()
       |> Enum.map(fn {role, %{prefix: prefix}} ->
         mode =
-          Enum.find_value(@channel_modes, nil, fn {letter, {_type, name, _opts}} ->
-            if name == role, do: letter
+          Enum.find_value(@channel_modes, nil, fn
+            {letter, {_type, ^role, _opts}} -> letter
+            _ -> nil
           end)
 
         {mode, prefix}

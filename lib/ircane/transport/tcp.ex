@@ -29,9 +29,10 @@ defmodule IRCane.Transport.TCP do
 
   @impl GenServer
   def handle_cast({:send_message, message}, {socket, state}) do
-    with :ok <- ThousandIsland.Socket.send(socket, message) do
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
+    case ThousandIsland.Socket.send(socket, message) do
+      :ok ->
+        {:noreply, {socket, state}, socket.read_timeout}
+
       {:error, reason} ->
         Logger.error("Failed to send message to #{state.hostname}: #{inspect(reason)}")
         Client.transport_error(state.client_pid, reason)

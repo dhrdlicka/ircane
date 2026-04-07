@@ -136,52 +136,52 @@ defmodule IRCane.Channel.Modes do
     result =
       Enum.reduce(updates, {channel_state, [], []}, fn
         update, {channel_state, applied_updates, errors} ->
-          case authorize(channel_state, :update_mode, client, update: update) do
-            :ok ->
-              case do_apply(channel_state, update, client) do
-                {:ok, new_channel_state, applied_update} ->
-                  {new_channel_state, [applied_update | applied_updates], errors}
+          case apply_mode(channel_state, update, client) do
+            {:ok, new_channel_state, applied_update} ->
+              {new_channel_state, [applied_update | applied_updates], errors}
 
-                {:ok, new_channel_state} ->
-                  {new_channel_state, [update | applied_updates], errors}
-
-                {:error, error} ->
-                  {channel_state, applied_updates, [error | errors]}
-
-                _ ->
-                  {channel_state, applied_updates, errors}
-              end
+            {:ok, new_channel_state} ->
+              {new_channel_state, [update | applied_updates], errors}
 
             {:error, error} ->
               {channel_state, applied_updates, [error | errors]}
+
+            _ ->
+              {channel_state, applied_updates, errors}
           end
       end)
 
     {:ok, result}
   end
 
-  defp do_apply(channel_state, {_op, :invite_only} = update, _client),
+  defp apply_mode(channel_state, update, client) do
+    with :ok <- authorize(channel_state, :update_mode, client, update: update) do
+      do_apply_mode(channel_state, update, client)
+    end
+  end
+
+  defp do_apply_mode(channel_state, {_op, :invite_only} = update, _client),
     do: apply_boolean_mode(channel_state, :invite_only?, update)
 
-  defp do_apply(channel_state, {_op, :moderated} = update, _client),
+  defp do_apply_mode(channel_state, {_op, :moderated} = update, _client),
     do: apply_boolean_mode(channel_state, :moderated?, update)
 
-  defp do_apply(channel_state, {_op, :secret} = update, _client),
+  defp do_apply_mode(channel_state, {_op, :secret} = update, _client),
     do: apply_boolean_mode(channel_state, :secret?, update)
 
-  defp do_apply(channel_state, {_op, :protected_topic} = update, _client),
+  defp do_apply_mode(channel_state, {_op, :protected_topic} = update, _client),
     do: apply_boolean_mode(channel_state, :protected_topic?, update)
 
-  defp do_apply(channel_state, {_op, :no_external_messages} = update, _client),
+  defp do_apply_mode(channel_state, {_op, :no_external_messages} = update, _client),
     do: apply_boolean_mode(channel_state, :no_external_messages?, update)
 
-  defp do_apply(channel_state, {_op, {:operator, _nickname}} = update, client),
+  defp do_apply_mode(channel_state, {_op, {:operator, _nickname}} = update, client),
     do: apply_prefix_mode(channel_state, update, client)
 
-  defp do_apply(channel_state, {_op, {:voice, _nickname}} = update, client),
+  defp do_apply_mode(channel_state, {_op, {:voice, _nickname}} = update, client),
     do: apply_prefix_mode(channel_state, update, client)
 
-  defp do_apply(
+  defp do_apply_mode(
          %{modes: %{channel_limit: old_limit}} = channel_state,
          {:add, {:channel_limit, new_limit}},
          _client
@@ -190,7 +190,7 @@ defmodule IRCane.Channel.Modes do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :channel_limit, new_limit)}}
   end
 
-  defp do_apply(
+  defp do_apply_mode(
          %{modes: %{channel_limit: limit}} = channel_state,
          {:remove, :channel_limit},
          _client
@@ -199,16 +199,16 @@ defmodule IRCane.Channel.Modes do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :channel_limit, nil)}}
   end
 
-  defp do_apply(%{modes: %{key: nil}} = channel_state, {:add, {:key, new_key}}, _client) do
+  defp do_apply_mode(%{modes: %{key: nil}} = channel_state, {:add, {:key, new_key}}, _client) do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :key, new_key)}}
   end
 
-  defp do_apply(%{modes: %{key: correct_key}} = channel_state, {:remove, {:key, key}}, _client)
+  defp do_apply_mode(%{modes: %{key: correct_key}} = channel_state, {:remove, {:key, key}}, _client)
        when key == correct_key do
     {:ok, %{channel_state | modes: Map.put(channel_state.modes, :key, nil)}}
   end
 
-  defp do_apply(%{modes: %{bans: bans}} = channel_state, {:add, {:ban, ban_mask}}, _client) do
+  defp do_apply_mode(%{modes: %{bans: bans}} = channel_state, {:add, {:ban, ban_mask}}, _client) do
     if MapSet.member?(bans, ban_mask) do
       :noop
     else
@@ -217,7 +217,7 @@ defmodule IRCane.Channel.Modes do
     end
   end
 
-  defp do_apply(%{modes: %{bans: bans}} = channel_state, {:remove, {:ban, ban_mask}}, _client) do
+  defp do_apply_mode(%{modes: %{bans: bans}} = channel_state, {:remove, {:ban, ban_mask}}, _client) do
     if MapSet.member?(bans, ban_mask) do
       new_bans = MapSet.delete(bans, ban_mask)
       {:ok, %{channel_state | modes: Map.put(channel_state.modes, :bans, new_bans)}}
@@ -226,7 +226,7 @@ defmodule IRCane.Channel.Modes do
     end
   end
 
-  defp do_apply(_channel_state, _update, _client), do: :noop
+  defp do_apply_mode(_channel_state, _update, _client), do: :noop
 
   defp apply_boolean_mode(%{modes: modes} = channel_state, field_name, {op, _mode_name}) do
     case {op, Map.get(modes, field_name)} do

@@ -46,22 +46,26 @@ defmodule IRCane.Channel.State do
     if member?(channel_state, client.pid) do
       :noop
     else
-      with :ok <- Modes.authorize(channel_state, :join, client, key: key) do
-        roles = if channel_state.new, do: [:operator], else: []
+      do_join(channel_state, client, monitor_ref, key)
+    end
+  end
 
-        membership =
-          %Membership{
-            nickname: client.nickname,
-            username: client.username,
-            hostname: client.hostname,
-            monitor_ref: monitor_ref,
-            roles: roles
-          }
+  defp do_join(channel_state, client, monitor_ref, key) do
+    with :ok <- Modes.authorize(channel_state, :join, client, key: key) do
+      roles = if channel_state.new, do: [:operator], else: []
 
-        members = Map.put(channel_state.members, client.pid, membership)
+      membership =
+        %Membership{
+          nickname: client.nickname,
+          username: client.username,
+          hostname: client.hostname,
+          monitor_ref: monitor_ref,
+          roles: roles
+        }
 
-        {:ok, %{channel_state | members: members, new: false}}
-      end
+      members = Map.put(channel_state.members, client.pid, membership)
+
+      {:ok, %{channel_state | members: members, new: false}}
     end
   end
 

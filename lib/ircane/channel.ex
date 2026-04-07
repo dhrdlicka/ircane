@@ -190,7 +190,6 @@ defmodule IRCane.Channel do
     {:reply, {:ok, state}, state}
   end
 
-  @impl true
   def handle_call({:join, client, key}, _from, state) do
     monitor_ref = Process.monitor(client.pid)
 
@@ -210,7 +209,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call(:names, _from, state) do
     case ChannelState.names(state, nil) do
       {:ok, names} ->
@@ -221,7 +219,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call({:privmsg, client, message}, _from, state) do
     case Modes.authorize(state, :speak, client) do
       :ok ->
@@ -232,7 +229,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call({:part, client, reason}, _from, state) do
     case ChannelState.part(state, client) do
       {:ok, {new_state, membership}} ->
@@ -249,7 +245,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call(:topic, _from, state) do
     case ChannelState.topic(state, nil) do
       {:ok, topic} ->
@@ -260,7 +255,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call(:mode, _from, state) do
     case ChannelState.mode(state, nil) do
       {:ok, modes} ->
@@ -271,7 +265,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call({:update_mode, client, updates}, _from, state) do
     case ChannelState.update_mode(state, client, updates) do
       {:ok, {new_state, applied_updates, errors}} ->
@@ -283,7 +276,6 @@ defmodule IRCane.Channel do
     end
   end
 
-  @impl true
   def handle_call({:update_topic, client, new_topic}, _from, state) do
     case ChannelState.update_topic(state, client, new_topic) do
       {:ok, new_state} ->
@@ -329,25 +321,21 @@ defmodule IRCane.Channel do
     {:noreply, state}
   end
 
-  @impl true
   def handle_continue({:notify_part, client, reason}, state) do
     do_broadcast(make_ref(), client, {:part, client, state.name, reason}, state)
     terminate_if_empty(state)
   end
 
-  @impl true
   def handle_continue({:notify_topic, client, new_topic}, state) do
     do_broadcast(make_ref(), client, {:topic, client, state.name, new_topic}, state)
     {:noreply, state}
   end
 
-  @impl true
   def handle_continue({:notify_mode, client, applied_changes}, state) do
     do_broadcast(make_ref(), client, {:channel_mode, client, state.name, applied_changes}, state)
     {:noreply, state}
   end
 
-  @impl true
   def handle_continue({:notify_privmsg, client, message}, state) do
     do_broadcast(make_ref(), client, {:privmsg, client, state.name, message}, state)
     {:noreply, state}

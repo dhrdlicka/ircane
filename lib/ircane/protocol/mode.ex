@@ -75,15 +75,11 @@ defmodule IRCane.Protocol.Mode do
     Enum.map(modes, fn
       {op, {name, arg}} when op in [:add, :remove] ->
         {_letter, _type, opts} = known_modes[name]
-        parse_fn = opts[:parse]
+        parse_fn = opts[:parse] || &({:ok, &1})
 
-        if parse_fn do
-          case parse_fn.(arg) do
-            {:ok, parsed} -> {op, {name, parsed}}
-            :error -> {:invalid, {:invalid_param, name, arg}}
-          end
-        else
-          {op, {name, arg}}
+        case parse_fn.(arg) do
+          {:ok, parsed} -> {op, {name, parsed}}
+          :error -> {:invalid, {:invalid_param, name, arg}}
         end
 
       other ->
