@@ -33,7 +33,7 @@ defmodule IRCane.User.State do
 
   def update_nickname(state, nickname) do
     with false <- String.contains?(nickname, [" ", ",", "*", "?", "!", "@", "."]),
-         false <- String.starts_with?(nickname, ["$", ":", "#", "+"]),
+         false <- String.starts_with?(nickname, [":", "#", "+"]),
          true <- String.printable?(nickname) do
       {:ok, %{state | nickname: nickname}}
     else
@@ -43,12 +43,13 @@ defmodule IRCane.User.State do
   end
 
   def update_username(state, username) do
-    with false <- String.contains?(username, "@"),
+    with false <- String.contains?(username, [" ", ",", "*", "?", "!", "@"]),
+         false <- String.starts_with?(username, [":"]),
          true <- String.printable?(username) do
       {:ok, %{state | username: username}}
     else
       _ ->
-        {:error, :erroneous_username}
+        {:error, :invalid_username}
     end
   end
 
@@ -60,8 +61,11 @@ defmodule IRCane.User.State do
     %{state | hostname: hostname}
   end
 
-  def try_register(%{registered?: false, nickname: nick, username: user} = state)
-      when not is_nil(nick) and not is_nil(user) do
+  def try_register(%{nickname: nil}), do: :noop
+
+  def try_register(%{username: nil}), do: :noop
+
+  def try_register(%{registered?: false} = state) do
     {:ok, %{state | registered?: true}}
   end
 
