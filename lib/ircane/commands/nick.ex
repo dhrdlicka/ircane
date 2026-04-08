@@ -5,6 +5,9 @@ defmodule IRCane.Commands.Nick do
 
   require Logger
 
+  def handle([new_nickname | _], state) when state.nickname == new_nickname,
+    do: {:ok, state}
+
   def handle([new_nickname | _], state) do
     with {:ok, new_state} <- UserState.update_nickname(state, new_nickname),
          :ok <- update_registration(state.nickname, new_nickname) do
