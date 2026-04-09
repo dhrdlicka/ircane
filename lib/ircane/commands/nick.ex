@@ -5,13 +5,10 @@ defmodule IRCane.Commands.Nick do
 
   require Logger
 
-  def handle([new_nickname | _], state) when state.nickname == new_nickname,
-    do: {:ok, state}
-
   def handle([new_nickname | _], state) do
     with {:ok, new_state} <- UserState.update_nickname(state, new_nickname),
          :ok <- update_registration(state.nickname, new_nickname) do
-      if state.registered? do
+      if state.registered? and state.nickname != new_nickname do
         Logger.notice("User changed nickname: #{state.nickname} -> #{new_nickname}")
 
         ref = make_ref()
@@ -41,6 +38,9 @@ defmodule IRCane.Commands.Nick do
           Registry.unregister(IRCane.UserRegistry, old_key)
         end
 
+        :ok
+
+      {:error, {:already_registered, pid}} when pid == self() ->
         :ok
 
       {:error, {:already_registered, _}} ->
