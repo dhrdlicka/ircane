@@ -81,6 +81,11 @@ defmodule IRCane.Client do
     GenServer.cast(pid, {:deliver, ref, from, message})
   end
 
+  @spec update_channel_roles(GenServer.server(), pid(), [Role.t()]) :: :ok
+  def update_channel_roles(pid, channel_pid, new_roles) do
+    GenServer.cast(pid, {:update_channel_roles, channel_pid, new_roles})
+  end
+
   @spec process_messages(GenServer.server(), [String.t()]) :: :ok
   def process_messages(pid, messages) do
     GenServer.cast(pid, {:process_messages, messages})
@@ -140,6 +145,11 @@ defmodule IRCane.Client do
       |> push_event(ref)
       |> maybe_timeout()
     end
+  end
+
+  def handle_cast({:update_channel_roles, channel_pid, new_roles}, state) do
+    updated_user = UserState.update_channel_roles(state.user, channel_pid, new_roles)
+    {:noreply, %{state | user: updated_user}}
   end
 
   def handle_cast({:notice, source, message}, state) do

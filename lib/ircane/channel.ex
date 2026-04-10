@@ -252,8 +252,10 @@ defmodule IRCane.Channel do
       {:ok, {new_state, applied_updates, errors}} ->
         update_registry_metadata(new_state)
 
+        role_changes = ChannelState.role_changes(new_state, state)
+
         {:reply, {:ok, {state.name, applied_updates, errors}}, new_state,
-         {:continue, {:notify_mode, client, applied_updates}}}
+         {:continue, {:notify_mode, client, applied_updates, role_changes}}}
 
       other ->
         {:reply, other, state}
@@ -319,8 +321,9 @@ defmodule IRCane.Channel do
     {:noreply, state}
   end
 
-  def handle_continue({:notify_mode, client, applied_changes}, state) do
+  def handle_continue({:notify_mode, client, applied_changes, role_changes}, state) do
     do_broadcast(make_ref(), client, {:channel_mode, client, state.name, applied_changes}, state)
+    Enum.each(role_changes, fn {pid, new_roles} -> Client.update_channel_roles(pid, self(), new_roles) end)
     {:noreply, state}
   end
 

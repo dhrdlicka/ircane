@@ -85,6 +85,10 @@ defmodule IRCane.User.State do
     {channel, %{state | channels: other_channels}}
   end
 
+  def update_channel_roles(state, channel_pid, new_roles) do
+    update_in(state.channels[channel_pid].roles, fn _ -> new_roles end)
+  end
+
   def quit(state, message) do
     %{state | quit_message: message}
   end
