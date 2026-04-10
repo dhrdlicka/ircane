@@ -1,5 +1,8 @@
 import Config
 
+alias IRCane.BanMask
+alias IRCane.Utils
+
 config :ircane,
   channel_modes: %{
     ?b => {:param_always, :ban, list: true, parse: &BanMask.parse/1, format: &BanMask.format/1},
@@ -56,3 +59,14 @@ config :ircane,
        highest_target: :protect
      }}
   ]
+
+config :ircane,
+  max_buffer: 8192,
+  max_line: 510,
+  event_dedup_size: 1000,
+  network_name: "TestNet",
+  server_name: "localhost",
+  version: "ircane-0.1",
+  registration_timeout_msec: 60_000,
+  ping_timeout_msec: 120_000,
+  heartbeat_interval_msec: 15_000
