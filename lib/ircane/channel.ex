@@ -21,18 +21,6 @@ defmodule IRCane.Channel do
     GenServer.start_link(__MODULE__, opts, name: via_tuple(channel_name))
   end
 
-  @spec state(String.t() | GenServer.server()) :: {:ok, ChannelState.t()} | {:error, term()}
-  def state(channel_name) when is_binary(channel_name) do
-    state(via_tuple(channel_name))
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
-  end
-
-  def state(pid) do
-    GenServer.call(pid, :state)
-  end
-
   @spec broadcast_nick(GenServer.server(), reference(), UserState.t(), String.t()) :: :ok
   def broadcast_nick(pid, ref, from, new_nickname) do
     GenServer.cast(pid, {:broadcast_nick, ref, from, new_nickname})
@@ -187,10 +175,6 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call(:state, _from, state) do
-    {:reply, {:ok, state}, state}
-  end
-
   def handle_call({:join, client, key}, _from, state) do
     monitor_ref = Process.monitor(client.pid)
 

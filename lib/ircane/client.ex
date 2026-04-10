@@ -52,18 +52,6 @@ defmodule IRCane.Client do
     GenServer.start_link(__MODULE__, transport)
   end
 
-  @spec state(String.t() | GenServer.server()) :: {:ok, t()} | {:error, term()}
-  def state(nickname) when is_binary(nickname) do
-    state(via_tuple(nickname))
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_nick, nickname}}
-  end
-
-  def state(pid) do
-    GenServer.call(pid, :state)
-  end
-
   @spec privmsg(String.t() | GenServer.server(), t(), String.t()) :: :ok | {:error, term()}
   def privmsg(nickname, client, message) when is_binary(nickname) do
     privmsg(via_tuple(nickname), client, message)
@@ -137,10 +125,6 @@ defmodule IRCane.Client do
   end
 
   @impl GenServer
-  def handle_call(:state, _from, state) do
-    {:reply, {:ok, state}, state}
-  end
-
   def handle_call({:privmsg, source, message}, _from, state) do
     send_message(state, {:privmsg, source, state.user.nickname, message})
     {:reply, :ok, state}
