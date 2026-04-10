@@ -43,7 +43,7 @@ defmodule IRCane.Transport.TCP do
   end
 
   def handle_cast({:update_user_info, user_info}, {socket, state}) do
-    {:noreply, {socket, %{state | username: user_info[:username]}}}
+    {:noreply, {socket, %{state | username: user_info[:username]}}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -129,6 +129,7 @@ defmodule IRCane.Transport.TCP do
     {:error, "Closing link: (#{mask}) [#{reason}]"}
     |> Replies.format(%{})
     |> List.wrap()
+    |> Enum.map(&IRCane.Protocol.Message.format/1)
     |> Enum.each(&ThousandIsland.Socket.send(socket, &1))
   end
 end

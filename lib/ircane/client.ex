@@ -16,7 +16,10 @@ defmodule IRCane.Client do
             buffer: "",
             rdns_ref: nil,
             seen_events: :queue.new(),
-            user: nil
+            user: nil,
+            connected_at_mono: nil,
+            last_rx_mono: nil,
+            ping_sent_at_mono: nil
 
   @type t :: any()
 
@@ -25,6 +28,7 @@ defmodule IRCane.Client do
   @command_handlers %{
     "NICK" => IRCane.Commands.Nick,
     "PING" => IRCane.Commands.Ping,
+    "PONG" => IRCane.Commands.Pong,
     "USER" => IRCane.Commands.User,
     "MOTD" => IRCane.Commands.Motd,
     "LUSERS" => IRCane.Commands.Lusers,
@@ -38,6 +42,10 @@ defmodule IRCane.Client do
     "QUIT" => IRCane.Commands.Quit
   }
   @unregistered_commands ["NICK", "USER"]
+
+  @registration_timeout_msec Application.compile_env!(:ircane, :registration_timeout_msec)
+  @ping_timeout_msec Application.compile_env!(:ircane, :ping_timeout_msec)
+  @heartbeat_interval_msec Application.compile_env!(:ircane, :heartbeat_interval_msec)
 
   @spec start_link(transport :: {module(), any()}) :: GenServer.on_start()
   def start_link(transport) do
@@ -97,7 +105,12 @@ defmodule IRCane.Client do
 
   @impl GenServer
   def init(transport) do
-    {:ok, %__MODULE__{transport: transport, user: UserState.new(self())}, {:continue, :init}}
+    {:ok,
+     %__MODULE__{
+       transport: transport,
+       user: UserState.new(self()),
+       connected_at_mono: System.monotonic_time(:millisecond)
+     }, {:continue, :init}}
   end
 
   @impl GenServer
@@ -136,29 +149,31 @@ defmodule IRCane.Client do
   @impl GenServer
   def handle_cast({:deliver, ref, _from, message}, state) do
     if received_event?(state, ref) do
-      {:noreply, state}
+      maybe_timeout(state)
     else
-      new_state =
-        state
-        |> send_message(message)
-        |> push_event(ref)
-
-      {:noreply, new_state}
+      state
+      |> send_message(message)
+      |> push_event(ref)
+      |> maybe_timeout()
     end
   end
 
   def handle_cast({:notice, source, message}, state) do
-    send_message(state, {:notice, source, state.user.nickname, message})
-    {:noreply, state}
+    state
+    |> send_message({:notice, source, state.user.nickname, message})
+    |> maybe_timeout()
   end
 
   def handle_cast({:process_messages, messages}, state) do
-    new_state = Enum.reduce(messages, state, &handle_line/2)
+    new_state =
+      messages
+      |> Enum.reduce(state, &handle_line/2)
+      |> update_last_rx()
 
     if new_state.user.quit_message do
       {:stop, :normal, new_state}
     else
-      {:noreply, new_state}
+      {:noreply, new_state, @heartbeat_interval_msec}
     end
   end
 
@@ -180,44 +195,43 @@ defmodule IRCane.Client do
     new_state =
       %{state | user: UserState.update_hostname(state.user, hostname), rdns_ref: rdns_ref}
 
-    {:noreply, new_state}
+    {:noreply, new_state, @heartbeat_interval_msec}
   end
 
   @impl GenServer
   def handle_info({ref, result}, %{rdns_ref: ref} = state) do
     Process.demonitor(ref, [:flush])
 
-    new_state =
-      state
-      |> finish_rdns(result)
-      |> maybe_register()
-
-    {:noreply, new_state}
+    state
+    |> finish_rdns(result)
+    |> maybe_register()
+    |> maybe_timeout()
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{rdns_ref: ref} = state) do
-    new_state =
-      state
-      |> finish_rdns({:error, {:crashed, reason}})
-      |> maybe_register()
-
-    {:noreply, new_state}
+    state
+    |> finish_rdns({:error, {:crashed, reason}})
+    |> maybe_register()
+    |> maybe_timeout()
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     case UserState.pop_channel(state.user, pid) do
       {nil, _} ->
         Logger.warning("Received DOWN message for unknown channel process #{inspect(pid)}")
-        {:noreply, state}
+        maybe_timeout(state)
 
       {%{name: channel_name}, updated_user} ->
-        send_message(
-          state,
+        %{state | user: updated_user}
+        |> send_message(
           {:kick, :server, channel_name, state.user.nickname, "Channel process terminated"}
         )
-
-        {:noreply, %{state | user: updated_user}}
+        |> maybe_timeout()
     end
+  end
+
+  def handle_info(:timeout, state) do
+    maybe_timeout(state)
   end
 
   defp via_tuple(nickname) do
@@ -301,6 +315,58 @@ defmodule IRCane.Client do
 
   defp maybe_register(state) do
     state
+  end
+
+  defp maybe_timeout(%{user: %{registered?: false}} = state) do
+    now = System.monotonic_time(:millisecond)
+    diff = now - state.connected_at_mono
+
+    if diff > @registration_timeout_msec do
+      Logger.info(
+        "Client #{client_id(state)} did not register within timeout period, disconnecting"
+      )
+
+      updated_user = UserState.quit(state.user, "Registration timeout")
+      {:stop, :normal, %{state | user: updated_user}}
+    else
+      {:noreply, state, @heartbeat_interval_msec}
+    end
+  end
+
+  defp maybe_timeout(%{ping_sent_at_mono: nil} = state) do
+    now = System.monotonic_time(:millisecond)
+    diff = now - state.last_rx_mono
+
+    if diff > @ping_timeout_msec do
+      Logger.info(
+        "Client #{client_id(state)} did not send any messages within timeout period, sending PING"
+      )
+
+      send_message(state, {:ping, "heartbeat"})
+      {:noreply, %{state | ping_sent_at_mono: now}, @heartbeat_interval_msec}
+    else
+      {:noreply, state, @heartbeat_interval_msec}
+    end
+  end
+
+  defp maybe_timeout(state) do
+    now = System.monotonic_time(:millisecond)
+    diff = now - state.ping_sent_at_mono
+
+    if diff > @ping_timeout_msec do
+      Logger.info(
+        "Client #{client_id(state)} did not respond to PING within timeout period, disconnecting"
+      )
+
+      updated_user = UserState.quit(state.user, "Ping timeout (#{diff / 1000} seconds)")
+      {:stop, :normal, %{state | user: updated_user}}
+    else
+      {:noreply, state, @heartbeat_interval_msec}
+    end
+  end
+
+  defp update_last_rx(state) do
+    %{state | last_rx_mono: System.monotonic_time(:millisecond), ping_sent_at_mono: nil}
   end
 
   defp send_message(state, message) do
