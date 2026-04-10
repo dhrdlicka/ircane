@@ -8,11 +8,11 @@ alias IRCane.UserRegistry
 
 defmodule IRCane.IEx.Helpers do
   def channel_state(name) do
-    :sys.get_state({:via, Registry, {ChannelRegistry, name}})
+    :sys.get_state({:via, Registry, {ChannelRegistry, String.downcase(name)}})
   end
 
   def client_state(nickname) do
-    :sys.get_state({:via, Registry, {UserRegistry, nickname}})
+    :sys.get_state({:via, Registry, {UserRegistry, String.downcase(nickname)}})
   end
 
   def transport_state(nickname) do
