@@ -1,7 +1,9 @@
 alias IRCane.Channel
+alias IRCane.Channel.State, as: ChannelState
 alias IRCane.ChannelRegistry
 alias IRCane.Client
 alias IRCane.Replies
+alias IRCane.User.State, as: UserState
 alias IRCane.UserRegistry
 
 defmodule IRCane.IEx.Helpers do

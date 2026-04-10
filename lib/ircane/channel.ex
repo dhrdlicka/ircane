@@ -156,15 +156,13 @@ defmodule IRCane.Channel do
   def init(opts) do
     channel_name = Keyword.fetch!(opts, :name)
 
-    with {:ok, _state} = result <- ChannelState.new(channel_name) do
+    with {:ok, state} <- ChannelState.new(channel_name) do
       Stats.channel_created()
       Logger.info("Channel #{channel_name} process started")
 
-      Registry.update_value(ChannelRegistry, String.downcase(channel_name), fn _ ->
-        channel_name
-      end)
+      update_registry_metadata(state)
 
-      result
+      {:ok, state}
     end
   end
 
@@ -185,6 +183,8 @@ defmodule IRCane.Channel do
         else
           Logger.notice("User #{client.nickname} joined channel #{state.name}")
         end
+
+        update_registry_metadata(new_state)
 
         {:reply, {:ok, self()}, new_state, {:continue, {:notify_join, client}}}
 
@@ -218,6 +218,8 @@ defmodule IRCane.Channel do
 
         Process.demonitor(membership.monitor_ref)
 
+        update_registry_metadata(new_state)
+
         {:reply, {:ok, self()}, new_state, {:continue, {:notify_part, client, reason}}}
 
       other ->
@@ -248,6 +250,8 @@ defmodule IRCane.Channel do
   def handle_call({:update_mode, client, updates}, _from, state) do
     case ChannelState.update_mode(state, client, updates) do
       {:ok, {new_state, applied_updates, errors}} ->
+        update_registry_metadata(new_state)
+
         {:reply, {:ok, {state.name, applied_updates, errors}}, new_state,
          {:continue, {:notify_mode, client, applied_updates}}}
 
@@ -260,6 +264,7 @@ defmodule IRCane.Channel do
     case ChannelState.update_topic(state, client, new_topic) do
       {:ok, new_state} ->
         Logger.info("User #{client.nickname} set topic in #{state.name}: #{inspect(new_topic)}")
+        update_registry_metadata(new_state)
         {:reply, :ok, new_state, {:continue, {:notify_topic, client, new_topic}}}
 
       other ->
@@ -284,6 +289,9 @@ defmodule IRCane.Channel do
 
     {new_state, member} = ChannelState.quit(state, client.pid)
     Process.demonitor(member.monitor_ref)
+
+    update_registry_metadata(new_state)
+
     terminate_if_empty(new_state)
   end
 
@@ -357,5 +365,11 @@ defmodule IRCane.Channel do
     else
       {:noreply, state}
     end
+  end
+
+  defp update_registry_metadata(state) do
+    Registry.update_value(ChannelRegistry, String.downcase(state.name), fn _ ->
+      ChannelState.metadata(state)
+    end)
   end
 end

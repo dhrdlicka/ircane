@@ -189,4 +189,14 @@ defmodule IRCane.Channel.State do
         false
     end
   end
+
+  @spec metadata(t()) :: map()
+  def metadata(channel_state) do
+    %{
+      name: channel_state.name,
+      topic: channel_state.topic,
+      secret?: Modes.secret?(channel_state),
+      member_count: map_size(channel_state.members)
+    }
+  end
 end

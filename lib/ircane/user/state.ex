@@ -88,4 +88,14 @@ defmodule IRCane.User.State do
   def quit(state, message) do
     %{state | quit_message: message}
   end
+
+  def metadata(state) do
+    %{
+      nickname: state.nickname,
+      username: state.username,
+      hostname: state.hostname,
+      away?: not is_nil(state.away_message),
+      invisible?: Map.get(state.modes, :invisible, false)
+    }
+  end
 end

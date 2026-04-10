@@ -7,7 +7,7 @@ defmodule IRCane.Commands.Nick do
 
   def handle([new_nickname | _], state) do
     with {:ok, new_state} <- UserState.update_nickname(state, new_nickname),
-         :ok <- update_registration(state.nickname, new_nickname) do
+         :ok <- update_registration(new_state, state.nickname) do
       if state.registered? and state.nickname != new_nickname do
         Logger.notice("User changed nickname: #{state.nickname} -> #{new_nickname}")
 
@@ -28,10 +28,10 @@ defmodule IRCane.Commands.Nick do
     {:error, :no_nickname_given}
   end
 
-  def update_registration(old_nickname, new_nickname) do
-    new_key = String.downcase(new_nickname)
+  def update_registration(state, old_nickname) do
+    new_key = String.downcase(state.nickname)
 
-    case Registry.register(IRCane.UserRegistry, new_key, new_nickname) do
+    case Registry.register(IRCane.UserRegistry, new_key, UserState.metadata(state)) do
       {:ok, _} ->
         if not is_nil(old_nickname) do
           old_key = String.downcase(old_nickname)
@@ -44,8 +44,8 @@ defmodule IRCane.Commands.Nick do
         :ok
 
       {:error, {:already_registered, _}} ->
-        Logger.debug("Nickname #{new_nickname} already in use")
-        {:error, {:nickname_in_use, new_nickname}}
+        Logger.debug("Nickname #{state.nickname} already in use")
+        {:error, {:nickname_in_use, state.nickname}}
     end
   end
 end

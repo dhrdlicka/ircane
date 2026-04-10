@@ -286,6 +286,9 @@ defmodule IRCane.Client do
         Stats.user_registered()
 
         mod.update_user_info(ref, username: new_state.username)
+        Registry.update_value(UserRegistry, String.downcase(new_state.nickname), fn _ ->
+          UserState.metadata(new_state)
+        end)
 
         %{state | user: new_state}
         |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
