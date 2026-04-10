@@ -69,6 +69,11 @@ defmodule IRCane.Channel.Modes do
     end
   end
 
+  @spec secret?(ChannelState.t()) :: boolean()
+  def secret?(channel_state) do
+    channel_state.modes[:secret?] || false
+  end
+
   defp ensure_member(channel_state, client_pid) do
     if ChannelState.member?(channel_state, client_pid),
       do: :ok,

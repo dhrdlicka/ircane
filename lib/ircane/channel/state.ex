@@ -70,9 +70,18 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec names(t(), UserState.t()) :: {:ok, [Membership.t()]} | {:error, atom()}
-  def names(channel_state, _client) do
-    {:ok, Map.values(channel_state.members)}
+  @spec names(t(), pid()) :: {:public | :secret | :none, [Membership.t()]}
+  def names(channel_state, client_pid) do
+    cond do
+      not Modes.secret?(channel_state) ->
+        {:public, Map.values(channel_state.members)}
+
+      member?(channel_state, client_pid) ->
+        {:secret, Map.values(channel_state.members)}
+
+      true ->
+        {:none, []}
+    end
   end
 
   @spec part(t(), UserState.t()) :: {:ok, {t(), Membership.t()}} | {:error, atom()}
@@ -91,9 +100,13 @@ defmodule IRCane.Channel.State do
     {%{channel_state | members: new_members}, member}
   end
 
-  @spec topic(t(), UserState.t()) :: {:ok, Topic.t()} | {:error, atom()}
-  def topic(channel_state, _client) do
-    {:ok, channel_state.topic}
+  @spec topic(t(), UserState.t()) :: {:ok, Topic.t()} | {:error, any()}
+  def topic(channel_state, client_pid) do
+    if not Modes.secret?(channel_state) or member?(channel_state, client_pid) do
+      {:ok, channel_state.topic}
+    else
+      {:error, {:no_such_channel, channel_state.name}}
+    end
   end
 
   @spec update_topic(t(), UserState.t(), String.t()) :: {:ok, t()} | {:error, atom()}
@@ -114,10 +127,13 @@ defmodule IRCane.Channel.State do
     end
   end
 
-  @spec mode(t(), UserState.t()) :: {:ok, [Mode.t()]} | {:error, atom()}
-  def mode(channel_state, _client) do
-    modes = Modes.current(channel_state)
-    {:ok, modes}
+  @spec mode(t(), UserState.t()) :: {:ok, [Mode.t()]} | {:error, any()}
+  def mode(channel_state, client_pid) do
+    if not Modes.secret?(channel_state) or member?(channel_state, client_pid) do
+      {:ok, Modes.current(channel_state)}
+    else
+      {:error, {:no_such_channel, channel_state.name}}
+    end
   end
 
   @spec update_mode(t(), UserState.t(), [Mode.mode_change()]) ::

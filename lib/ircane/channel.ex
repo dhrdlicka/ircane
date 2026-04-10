@@ -70,12 +70,12 @@ defmodule IRCane.Channel do
   end
 
   @spec names(String.t() | GenServer.server()) ::
-          {:ok, {String.t(), [Membership.t()]}} | {:error, term()}
+          {String.t(), :public | :secret | :none, [Membership.t()]}
   def names(channel_name) when is_binary(channel_name) do
     names(via_tuple(channel_name))
   catch
     :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
+      {channel_name, :none, []}
   end
 
   def names(pid) do
@@ -210,14 +210,9 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:names, _from, state) do
-    case ChannelState.names(state, nil) do
-      {:ok, names} ->
-        {:reply, {:ok, {state.name, names}}, state}
-
-      other ->
-        {:reply, other, state}
-    end
+  def handle_call(:names, {pid, _tag}, state) do
+    {status, names} = ChannelState.names(state, pid)
+    {:reply, {state.name, status, names}, state}
   end
 
   def handle_call({:privmsg, client, message}, _from, state) do
@@ -246,8 +241,8 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:topic, _from, state) do
-    case ChannelState.topic(state, nil) do
+  def handle_call(:topic, {pid, _tag}, state) do
+    case ChannelState.topic(state, pid) do
       {:ok, topic} ->
         {:reply, {:ok, {state.name, topic}}, state}
 
@@ -256,8 +251,8 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:mode, _from, state) do
-    case ChannelState.mode(state, nil) do
+  def handle_call(:mode, {pid, _tag}, state) do
+    case ChannelState.mode(state, pid) do
       {:ok, modes} ->
         {:reply, {:ok, {state.name, modes}}, state}
 

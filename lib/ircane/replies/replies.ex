@@ -42,6 +42,9 @@ defmodule IRCane.Replies do
     ]
   end
 
+  def format({:names, channel_name, :none, _nicknames}, client),
+    do: numeric({:end_of_names, channel_name}, client)
+
   def format({:names, channel_name, status, nicknames}, client) do
     nicknames
     |> Enum.chunk_every(10)
