@@ -169,6 +169,9 @@ defmodule IRCane.Replies.Numerics do
   def format({:need_more_params, command}, client),
     do: numeric(461, client, "Not enough parameters", [command])
 
+  def format(:already_registered, client),
+    do: numeric(462, client, "You may not reregister")
+
   def format(:invalid_username, client),
     do: numeric(468, client, "Invalid username", ["USER"])
 
