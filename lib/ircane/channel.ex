@@ -58,7 +58,7 @@ defmodule IRCane.Channel do
   end
 
   @spec names(String.t() | GenServer.server()) ::
-          {String.t(), :public | :secret | :none, [Membership.t()]}
+          {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
   def names(channel_name) when is_binary(channel_name) do
     names(via_tuple(channel_name))
   catch
@@ -196,7 +196,7 @@ defmodule IRCane.Channel do
 
   def handle_call(:names, {pid, _tag}, state) do
     {status, names} = ChannelState.names(state, pid)
-    {:reply, {state.name, status, names}, state}
+    {:reply, {state.name, self(), status, names}, state}
   end
 
   def handle_call({:privmsg, client, message}, _from, state) do
