@@ -34,7 +34,7 @@ defmodule IRCane.Commands.Join do
   defp join_channel(channel_name, key, state) do
     with {:ok, channel_pid} <- do_join(channel_name, key, state),
          {:ok, {channel_name, topic}} <- Channel.topic(channel_pid) do
-      {_channel_name, status, names} = Channel.names(channel_pid)
+      {_channel_name, _channel_pid, status, names} = Channel.names(channel_pid)
 
       new_state =
         UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
