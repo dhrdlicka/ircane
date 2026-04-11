@@ -199,4 +199,11 @@ defmodule IRCane.Channel.State do
       member_count: map_size(channel_state.members)
     }
   end
+
+  @spec role_changes(t(), t()) :: [{pid(), [Role.t()]}]
+  def role_changes(new_state, old_state) do
+    new_state.members
+    |> Enum.filter(fn {pid, membership} -> membership.roles != old_state.members[pid].roles end)
+    |> Enum.map(fn {pid, membership} -> {pid, membership.roles} end)
+  end
 end

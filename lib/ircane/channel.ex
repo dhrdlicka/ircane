@@ -308,6 +308,7 @@ defmodule IRCane.Channel do
   @impl true
   def handle_continue({:notify_join, client}, state) do
     do_broadcast(make_ref(), client, {:join, client, state.name}, state)
+    Client.update_channel_roles(client.pid, self(), state.members[client.pid].roles)
     {:noreply, state}
   end
 
