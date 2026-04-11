@@ -1,7 +1,6 @@
 defmodule IRCane.User.State do
   @moduledoc false
   alias IRCane.User.ChannelMembership
-
   @enforce_keys [:pid]
   defstruct pid: nil,
             nickname: nil,
@@ -12,7 +11,9 @@ defmodule IRCane.User.State do
             modes: %{},
             away_message: nil,
             quit_message: nil,
-            channels: %{}
+            channels: %{},
+            connected_at: nil,
+            idle_since: nil
 
   @type t :: %__MODULE__{
           pid: pid(),
@@ -61,12 +62,16 @@ defmodule IRCane.User.State do
     %{state | hostname: hostname}
   end
 
+  def update_idle(state) do
+    %{state | idle_since: DateTime.utc_now()}
+  end
+
   def try_register(%{nickname: nil}), do: :noop
 
   def try_register(%{username: nil}), do: :noop
 
   def try_register(%{registered?: false} = state) do
-    {:ok, %{state | registered?: true}}
+    {:ok, %{state | registered?: true, connected_at: DateTime.utc_now(), idle_since: DateTime.utc_now()}}
   end
 
   def try_register(_state), do: :noop
@@ -93,13 +98,17 @@ defmodule IRCane.User.State do
     %{state | quit_message: message}
   end
 
+  def invisible?(state) do
+    Map.get(state.modes, :invisible, false)
+  end
+
   def metadata(state) do
     %{
       nickname: state.nickname,
       username: state.username,
       hostname: state.hostname,
       away?: not is_nil(state.away_message),
-      invisible?: Map.get(state.modes, :invisible, false)
+      invisible?: invisible?(state)
     }
   end
 end

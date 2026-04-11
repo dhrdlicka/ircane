@@ -43,6 +43,7 @@ defmodule IRCane.Client do
     "QUIT" => IRCane.Commands.Quit
   }
   @unregistered_commands ["NICK", "USER"]
+  @update_idle_commands ["JOIN", "PART", "PRIVMSG", "NICK", "MODE", "AWAY"]
 
   @registration_timeout_msec Application.compile_env!(:ircane, :registration_timeout_msec)
   @ping_timeout_msec Application.compile_env!(:ircane, :ping_timeout_msec)
@@ -249,6 +250,7 @@ defmodule IRCane.Client do
         command
         |> handle_command(params, state)
         |> maybe_register()
+        |> maybe_update_idle(command)
 
       {:error, reason} ->
         Logger.debug("Failed to parse message from #{client_id(state)}: #{inspect(reason)}")
@@ -362,6 +364,12 @@ defmodule IRCane.Client do
       {:noreply, state, @heartbeat_interval_msec}
     end
   end
+
+  defp maybe_update_idle(state, command) when command in @update_idle_commands do
+    %{state | user: UserState.update_idle(state.user)}
+  end
+
+  defp maybe_update_idle(state, _command), do: state
 
   defp update_last_rx(state) do
     %{state | last_rx_mono: System.monotonic_time(:millisecond), ping_sent_at_mono: nil}
