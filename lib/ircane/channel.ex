@@ -324,7 +324,11 @@ defmodule IRCane.Channel do
 
   def handle_continue({:notify_mode, client, applied_changes, role_changes}, state) do
     do_broadcast(make_ref(), client, {:channel_mode, client, state.name, applied_changes}, state)
-    Enum.each(role_changes, fn {pid, new_roles} -> Client.update_channel_roles(pid, self(), new_roles) end)
+
+    Enum.each(role_changes, fn {pid, new_roles} ->
+      Client.update_channel_roles(pid, self(), new_roles)
+    end)
+
     {:noreply, state}
   end
 

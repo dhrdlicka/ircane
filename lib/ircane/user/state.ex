@@ -71,7 +71,13 @@ defmodule IRCane.User.State do
   def try_register(%{username: nil}), do: :noop
 
   def try_register(%{registered?: false} = state) do
-    {:ok, %{state | registered?: true, connected_at: DateTime.utc_now(), idle_since: DateTime.utc_now()}}
+    {:ok,
+     %{
+       state
+       | registered?: true,
+         connected_at: DateTime.utc_now(),
+         idle_since: DateTime.utc_now()
+     }}
   end
 
   def try_register(_state), do: :noop

@@ -1,4 +1,5 @@
 defmodule IRCane.TestFactory do
+  @moduledoc false
   alias IRCane.Channel.Membership
   alias IRCane.Channel.Topic
   alias IRCane.User.State, as: UserState
