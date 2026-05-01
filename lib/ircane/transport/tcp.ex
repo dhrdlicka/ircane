@@ -132,5 +132,4 @@ defmodule IRCane.Transport.TCP do
     |> Enum.map(&IRCane.Protocol.Message.format/1)
     |> Enum.each(&ThousandIsland.Socket.send(socket, &1))
   end
-
 end

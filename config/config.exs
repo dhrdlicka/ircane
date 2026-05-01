@@ -61,7 +61,10 @@ config :ircane,
   ]
 
 config :ircane,
-  max_buffer: 8192,
+  listeners: [
+    {ThousandIsland, handler_module: IRCane.Transport.TCP, port: 6667, read_timeout: :infinity}
+  ],
+  max_buffer_size: 8192,
   max_line: 510,
   event_dedup_size: 1000,
   network_name: "TestNet",
@@ -70,3 +73,9 @@ config :ircane,
   registration_timeout_msec: 60_000,
   ping_timeout_msec: 120_000,
   heartbeat_interval_msec: 15_000
+
+env_config = Path.join(__DIR__, "#{config_env()}.exs")
+
+if File.exists?(env_config) do
+  import_config "#{config_env()}.exs"
+end
