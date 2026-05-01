@@ -3,10 +3,10 @@ defmodule IRCane.Replies do
   alias IRCane.Channel.Topic
   alias IRCane.Protocol.Message
   alias IRCane.Protocol.Mode
+  alias IRCane.Replies.ISupport
   alias IRCane.Replies.Notices
   alias IRCane.Replies.Numerics
   alias IRCane.User.State, as: UserState
-  alias IRCane.Utils.ISupport
 
   @server_name Application.compile_env(:ircane, :server_name)
   @channel_modes Application.compile_env(:ircane, :channel_modes)
