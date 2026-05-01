@@ -24,8 +24,6 @@ defmodule IRCane.Client do
 
   @type t :: any()
 
-  @event_dedup_size 1_000
-  @max_line 510
   @command_handlers %{
     "NICK" => IRCane.Commands.Nick,
     "PING" => IRCane.Commands.Ping,
@@ -45,9 +43,8 @@ defmodule IRCane.Client do
   @unregistered_commands ["NICK", "USER"]
   @update_idle_commands ["JOIN", "PART", "PRIVMSG", "NICK", "MODE", "AWAY"]
 
-  @registration_timeout_msec Application.compile_env!(:ircane, :registration_timeout_msec)
-  @ping_timeout_msec Application.compile_env!(:ircane, :ping_timeout_msec)
-  @heartbeat_interval_msec Application.compile_env!(:ircane, :heartbeat_interval_msec)
+  @max_line Application.compile_env!(:ircane, :max_line)
+  @event_dedup_size Application.compile_env!(:ircane, :event_dedup_size)
 
   @spec start_link(transport :: {module(), any()}) :: GenServer.on_start()
   def start_link(transport) do
@@ -169,7 +166,7 @@ defmodule IRCane.Client do
     if new_state.user.quit_message do
       {:stop, :normal, new_state}
     else
-      {:noreply, new_state, @heartbeat_interval_msec}
+      {:noreply, new_state, heartbeat_interval_msec()}
     end
   end
 
@@ -191,7 +188,7 @@ defmodule IRCane.Client do
     new_state =
       %{state | user: UserState.update_hostname(state.user, hostname), rdns_ref: rdns_ref}
 
-    {:noreply, new_state, @heartbeat_interval_msec}
+    {:noreply, new_state, heartbeat_interval_msec()}
   end
 
   @impl GenServer
@@ -322,7 +319,7 @@ defmodule IRCane.Client do
     now = System.monotonic_time(:millisecond)
     diff = now - state.connected_at_mono
 
-    if diff > @registration_timeout_msec do
+    if diff > registration_timeout_msec() do
       Logger.info(
         "Client #{client_id(state)} did not register within timeout period, disconnecting"
       )
@@ -330,7 +327,7 @@ defmodule IRCane.Client do
       updated_user = UserState.quit(state.user, "Registration timeout")
       {:stop, :normal, %{state | user: updated_user}}
     else
-      {:noreply, state, @heartbeat_interval_msec}
+      {:noreply, state, heartbeat_interval_msec()}
     end
   end
 
@@ -338,15 +335,15 @@ defmodule IRCane.Client do
     now = System.monotonic_time(:millisecond)
     diff = now - state.last_rx_mono
 
-    if diff > @ping_timeout_msec do
+    if diff > ping_timeout_msec() do
       Logger.info(
         "Client #{client_id(state)} did not send any messages within timeout period, sending PING"
       )
 
       send_message(state, {:ping, "heartbeat"})
-      {:noreply, %{state | ping_sent_at_mono: now}, @heartbeat_interval_msec}
+      {:noreply, %{state | ping_sent_at_mono: now}, heartbeat_interval_msec()}
     else
-      {:noreply, state, @heartbeat_interval_msec}
+      {:noreply, state, heartbeat_interval_msec()}
     end
   end
 
@@ -354,7 +351,7 @@ defmodule IRCane.Client do
     now = System.monotonic_time(:millisecond)
     diff = now - state.ping_sent_at_mono
 
-    if diff > @ping_timeout_msec do
+    if diff > ping_timeout_msec() do
       Logger.info(
         "Client #{client_id(state)} did not respond to PING within timeout period, disconnecting"
       )
@@ -362,7 +359,7 @@ defmodule IRCane.Client do
       updated_user = UserState.quit(state.user, "Ping timeout (#{diff / 1000} seconds)")
       {:stop, :normal, %{state | user: updated_user}}
     else
-      {:noreply, state, @heartbeat_interval_msec}
+      {:noreply, state, heartbeat_interval_msec()}
     end
   end
 
@@ -429,6 +426,10 @@ defmodule IRCane.Client do
       %{state | seen_events: queue}
     end
   end
+
+  defp registration_timeout_msec, do: Application.fetch_env!(:ircane, :registration_timeout_msec)
+  defp ping_timeout_msec, do: Application.fetch_env!(:ircane, :ping_timeout_msec)
+  defp heartbeat_interval_msec, do: Application.fetch_env!(:ircane, :heartbeat_interval_msec)
 
   defp client_id(%{user: user}), do: client_id(user)
 

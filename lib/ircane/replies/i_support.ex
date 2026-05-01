@@ -1,8 +1,8 @@
 defmodule IRCane.Replies.ISupport do
   @moduledoc false
-  @channel_modes Application.compile_env(:ircane, :channel_modes)
-  @roles Application.compile_env(:ircane, :roles)
-  @network_name Application.compile_env(:ircane, :network_name)
+  @channel_modes Application.compile_env!(:ircane, :channel_modes)
+  @roles Application.compile_env!(:ircane, :roles)
+  @network_name Application.compile_env!(:ircane, :network_name)
 
   def build_chanmodes do
     %{type_a: modes_a, type_b: modes_b, type_c: modes_c, type_d: modes_d} =

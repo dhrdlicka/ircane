@@ -9,7 +9,7 @@ defmodule IRCane.Transport.TCP do
   alias IRCane.Replies
   alias IRCane.Stats
 
-  @max_buffer_size 8_192
+  @max_buffer_size Application.compile_env!(:ircane, :max_buffer_size)
 
   def finish_handshake(pid) do
     GenServer.call(pid, :finish_handshake)
@@ -132,4 +132,5 @@ defmodule IRCane.Transport.TCP do
     |> Enum.map(&IRCane.Protocol.Message.format/1)
     |> Enum.each(&ThousandIsland.Socket.send(socket, &1))
   end
+
 end

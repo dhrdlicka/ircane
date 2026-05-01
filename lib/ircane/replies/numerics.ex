@@ -6,10 +6,10 @@ defmodule IRCane.Replies.Numerics do
   alias IRCane.Protocol.Mode
   alias IRCane.Stats
 
-  @server_name Application.compile_env(:ircane, :server_name)
-  @network_name Application.compile_env(:ircane, :network_name)
-  @version Application.compile_env(:ircane, :version)
-  @user_modes Application.compile_env(:ircane, :user_modes)
+  @server_name Application.compile_env!(:ircane, :server_name)
+  @network_name Application.compile_env!(:ircane, :network_name)
+  @version Application.compile_env!(:ircane, :version)
+  @user_modes Application.compile_env!(:ircane, :user_modes)
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   def format(:welcome, client),

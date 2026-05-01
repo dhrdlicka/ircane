@@ -8,8 +8,8 @@ defmodule IRCane.Replies do
   alias IRCane.Replies.Numerics
   alias IRCane.User.State, as: UserState
 
-  @server_name Application.compile_env(:ircane, :server_name)
-  @channel_modes Application.compile_env(:ircane, :channel_modes)
+  @server_name Application.compile_env!(:ircane, :server_name)
+  @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
   def format({:nick, source, new_nickname}, _client),
     do: message(source, "NICK", [new_nickname])
