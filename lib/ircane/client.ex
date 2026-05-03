@@ -2,6 +2,8 @@ defmodule IRCane.Client do
   @moduledoc false
   alias IRCane.Channel
   alias IRCane.Channel.Role
+  alias IRCane.Command.Dispatcher
+  alias IRCane.Command.Runner
   alias IRCane.Protocol.Message
   alias IRCane.Replies
   alias IRCane.Stats
@@ -276,11 +278,16 @@ defmodule IRCane.Client do
   defp run_command(command, params, user_state) do
     case Map.get(@command_handlers, command) do
       nil ->
-        Logger.debug("Unknown command from #{client_id(user_state)}: #{command}")
-        {:error, {:unknown_command, command}}
+        dispatch_command(command, params, user_state)
 
       handler ->
         handler.handle(params, user_state)
+    end
+  end
+
+  defp dispatch_command(command, params, user_state) do
+    with {:ok, plan} <- Dispatcher.dispatch(command, params, user_state) do
+      Runner.run(plan)
     end
   end
 
