@@ -1,7 +1,12 @@
 defmodule IRCane.Commands.User do
   @moduledoc false
+
+  alias IRCane.Command.Plan
   alias IRCane.User.State, as: UserState
+
   require Logger
+
+  @behaviour IRCane.Command.Handler
 
   def handle(_, %{registered?: true} = _state) do
     {:error, :already_registered}
@@ -10,7 +15,7 @@ defmodule IRCane.Commands.User do
   def handle([username, _, _, realname | _], state) do
     with {:ok, new_state} <- UserState.update_username(state, username) do
       Logger.debug("User set username: #{username}, realname: #{realname}")
-      {:ok, UserState.update_realname(new_state, realname)}
+      {:ok, new_state |> UserState.update_realname(realname) |> Plan.new()}
     end
   end
 

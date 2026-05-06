@@ -1,12 +1,18 @@
 defmodule IRCane.Command.Dispatcher do
   @moduledoc false
 
-  alias IRCane.User.State, as: UserState
   alias IRCane.Command.Plan
+  alias IRCane.User.State, as: UserState
 
   require Logger
 
-  @command_handlers %{}
+  @command_handlers %{
+    "PING" => IRCane.Commands.Ping,
+    "PONG" => IRCane.Commands.Pong,
+    "USER" => IRCane.Commands.User,
+    "MOTD" => IRCane.Commands.Motd,
+    "QUIT" => IRCane.Commands.Quit
+  }
   @unregistered_commands ["PASS", "NICK", "USER"]
 
   @spec dispatch(String.t(), [String.t()], UserState.t()) :: {:ok, Plan.t()} | {:error, term()}

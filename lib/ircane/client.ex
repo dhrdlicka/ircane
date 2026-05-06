@@ -28,10 +28,6 @@ defmodule IRCane.Client do
 
   @command_handlers %{
     "NICK" => IRCane.Commands.Nick,
-    "PING" => IRCane.Commands.Ping,
-    "PONG" => IRCane.Commands.Pong,
-    "USER" => IRCane.Commands.User,
-    "MOTD" => IRCane.Commands.Motd,
     "LUSERS" => IRCane.Commands.Lusers,
     "PRIVMSG" => IRCane.Commands.Privmsg,
     "NOTICE" => IRCane.Commands.Notice,
@@ -39,8 +35,7 @@ defmodule IRCane.Client do
     "PART" => IRCane.Commands.Part,
     "NAMES" => IRCane.Commands.Names,
     "TOPIC" => IRCane.Commands.Topic,
-    "MODE" => IRCane.Commands.Mode,
-    "QUIT" => IRCane.Commands.Quit
+    "MODE" => IRCane.Commands.Mode
   }
   @unregistered_commands ["NICK", "USER"]
   @update_idle_commands ["JOIN", "PART", "PRIVMSG", "NICK", "MODE", "AWAY"]
