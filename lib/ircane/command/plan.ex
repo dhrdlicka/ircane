@@ -1,6 +1,8 @@
 defmodule IRCane.Command.Plan do
   @moduledoc false
 
+  alias IRCane.Command.Effects
+  alias IRCane.Replies
   alias IRCane.User.State, as: UserState
 
   @enforce_keys [:state]
@@ -8,13 +10,10 @@ defmodule IRCane.Command.Plan do
             effects: [],
             replies: []
 
-  @type effect :: term()
-  @type reply :: term()
-
   @type t :: %__MODULE__{
           state: UserState.t(),
-          effects: [effect()],
-          replies: [reply()]
+          effects: [Effects.effect()],
+          replies: [Replies.reply()]
         }
 
   @spec new(UserState.t()) :: t()
@@ -24,18 +23,18 @@ defmodule IRCane.Command.Plan do
     }
   end
 
-  @spec with_effect(t(), effect()) :: t()
+  @spec with_effect(t(), Effects.effect()) :: t()
   def with_effect(result, effect), do: with_effects(result, [effect])
 
-  @spec with_effects(t(), [effect()]) :: t()
+  @spec with_effects(t(), [Effects.effect()]) :: t()
   def with_effects(result, effects) do
     %{result | effects: result.effects ++ effects}
   end
 
-  @spec with_reply(t(), reply()) :: t()
+  @spec with_reply(t(), Replies.reply()) :: t()
   def with_reply(result, reply), do: with_replies(result, [reply])
 
-  @spec with_replies(t(), [reply()]) :: t()
+  @spec with_replies(t(), [Replies.reply()]) :: t()
   def with_replies(result, replies) do
     %{result | replies: result.replies ++ replies}
   end

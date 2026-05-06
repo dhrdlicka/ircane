@@ -27,7 +27,6 @@ defmodule IRCane.Client do
   @type t :: any()
 
   @command_handlers %{
-    "NICK" => IRCane.Commands.Nick,
     "LUSERS" => IRCane.Commands.Lusers,
     "PRIVMSG" => IRCane.Commands.Privmsg,
     "NOTICE" => IRCane.Commands.Notice,

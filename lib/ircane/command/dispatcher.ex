@@ -2,11 +2,13 @@ defmodule IRCane.Command.Dispatcher do
   @moduledoc false
 
   alias IRCane.Command.Plan
+  alias IRCane.Replies
   alias IRCane.User.State, as: UserState
 
   require Logger
 
   @command_handlers %{
+    "NICK" => IRCane.Commands.Nick,
     "PING" => IRCane.Commands.Ping,
     "PONG" => IRCane.Commands.Pong,
     "USER" => IRCane.Commands.User,
@@ -15,7 +17,8 @@ defmodule IRCane.Command.Dispatcher do
   }
   @unregistered_commands ["PASS", "NICK", "USER"]
 
-  @spec dispatch(String.t(), [String.t()], UserState.t()) :: {:ok, Plan.t()} | {:error, term()}
+  @spec dispatch(String.t(), [String.t()], UserState.t()) ::
+          {:ok, Plan.t()} | {:error, Replies.reply()}
   def dispatch(command, _params, %{registered?: false} = _user_state)
       when command not in @unregistered_commands do
     {:error, :not_registered}

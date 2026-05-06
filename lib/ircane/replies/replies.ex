@@ -8,6 +8,8 @@ defmodule IRCane.Replies do
   alias IRCane.Replies.Numerics
   alias IRCane.User.State, as: UserState
 
+  @type reply :: atom() | tuple()
+
   @server_name Application.compile_env!(:ircane, :server_name)
   @channel_modes Application.compile_env!(:ircane, :channel_modes)
 
