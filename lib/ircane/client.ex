@@ -26,17 +26,6 @@ defmodule IRCane.Client do
 
   @type t :: any()
 
-  @command_handlers %{
-    "LUSERS" => IRCane.Commands.Lusers,
-    "PRIVMSG" => IRCane.Commands.Privmsg,
-    "NOTICE" => IRCane.Commands.Notice,
-    "JOIN" => IRCane.Commands.Join,
-    "PART" => IRCane.Commands.Part,
-    "NAMES" => IRCane.Commands.Names,
-    "TOPIC" => IRCane.Commands.Topic,
-    "MODE" => IRCane.Commands.Mode
-  }
-  @unregistered_commands ["NICK", "USER"]
   @update_idle_commands ["JOIN", "PART", "PRIVMSG", "NICK", "MODE", "AWAY"]
 
   @max_line Application.compile_env!(:ircane, :max_line)
@@ -252,36 +241,12 @@ defmodule IRCane.Client do
   end
 
   defp handle_command(command, params, state) do
-    case command |> String.upcase() |> run_command(params, state.user) do
-      {:ok, new_state} ->
-        %{state | user: new_state}
-
-      {:ok, result, new_state} ->
-        send_message(%{state | user: new_state}, result)
-
+    with {:ok, plan} <- Dispatcher.dispatch(command, params, state.user),
+         {:ok, replies, new_state} <- Runner.run(plan) do
+      send_message(%{state | user: new_state}, replies)
+    else
       {:error, error} ->
         send_message(state, error)
-    end
-  end
-
-  defp run_command(command, _params, %{registered?: false} = _user_state)
-       when command not in @unregistered_commands do
-    {:error, :not_registered}
-  end
-
-  defp run_command(command, params, user_state) do
-    case Map.get(@command_handlers, command) do
-      nil ->
-        dispatch_command(command, params, user_state)
-
-      handler ->
-        handler.handle(params, user_state)
-    end
-  end
-
-  defp dispatch_command(command, params, user_state) do
-    with {:ok, plan} <- Dispatcher.dispatch(command, params, user_state) do
-      Runner.run(plan)
     end
   end
 

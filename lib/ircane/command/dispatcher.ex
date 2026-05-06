@@ -13,6 +13,14 @@ defmodule IRCane.Command.Dispatcher do
     "PONG" => IRCane.Commands.Pong,
     "USER" => IRCane.Commands.User,
     "MOTD" => IRCane.Commands.Motd,
+    "LUSERS" => IRCane.Commands.Lusers,
+    "PRIVMSG" => IRCane.Commands.Privmsg,
+    "NOTICE" => IRCane.Commands.Notice,
+    "JOIN" => IRCane.Commands.Join,
+    "PART" => IRCane.Commands.Part,
+    "NAMES" => IRCane.Commands.Names,
+    "TOPIC" => IRCane.Commands.Topic,
+    "MODE" => IRCane.Commands.Mode,
     "QUIT" => IRCane.Commands.Quit
   }
   @unregistered_commands ["PASS", "NICK", "USER"]
@@ -25,15 +33,24 @@ defmodule IRCane.Command.Dispatcher do
   end
 
   def dispatch(command, params, user_state) do
-    case Map.get(@command_handlers, command) do
+    case Map.get(@command_handlers, String.upcase(command)) do
       nil ->
         Logger.debug("Unknown command from #{client_id(user_state)}: #{command}")
         {:error, {:unknown_command, command}}
 
       handler ->
-        handler.handle(params, user_state)
+        params
+        |> handler.handle(user_state)
+        |> maybe_convert_legacy_to_plan()
     end
   end
+
+  defp maybe_convert_legacy_to_plan({:ok, %UserState{} = state}), do: {:ok, Plan.new(state)}
+
+  defp maybe_convert_legacy_to_plan({:ok, replies, %UserState{} = state}),
+    do: {:ok, Plan.new(state) |> Plan.with_replies(replies)}
+
+  defp maybe_convert_legacy_to_plan(other), do: other
 
   defp client_id(%{user: user}), do: client_id(user)
 
