@@ -1,98 +1,42 @@
 defmodule IRCane.Commands.Join do
   @moduledoc false
-  alias IRCane.Channel
-  alias IRCane.ChannelSupervisor
-  alias IRCane.User.State, as: UserState
+
+  alias IRCane.Command.Plan
 
   require Logger
 
-  @max_join_attempts 3
+  @behaviour IRCane.Command.Handler
+
+  def handle(["0"], state) do
+    effects =
+      Enum.map(state.channels, fn {_pid, %{name: channel_name}} ->
+        {:part_channel, channel_name, ""}
+      end)
+
+    state
+    |> Plan.new()
+    |> Plan.with_effects(effects)
+    |> then(&{:ok, &1})
+  end
 
   def handle([channels | keys], state) do
-    channels
-    |> String.split(",")
-    |> zip_fill(keys)
-    |> Enum.reduce({[], state}, fn {channel_name, key}, {replies, current_state} ->
-      case join_channel(channel_name, key, current_state) do
-        {:ok, new_state} ->
-          {replies, new_state}
+    effects =
+      channels
+      |> String.split(",")
+      |> zip_fill(keys)
+      |> Enum.map(fn {channel_name, key} -> {:join_channel, channel_name, key} end)
 
-        {:ok, new_replies, new_state} ->
-          {new_replies ++ replies, new_state}
-
-        {:error, reason} ->
-          {[reason | replies], current_state}
-      end
-    end)
-    |> then(fn {replies, final_state} -> {:ok, replies, final_state} end)
+    state
+    |> Plan.new()
+    |> Plan.with_effects(effects)
+    |> then(&{:ok, &1})
   end
 
   def handle(_, _state) do
     {:error, {:need_more_params, "JOIN"}}
   end
 
-  defp join_channel(channel_name, key, state) do
-    with {:ok, channel_pid} <- do_join(channel_name, key, state),
-         {:ok, {channel_name, topic}} <- Channel.topic(channel_pid) do
-      {_channel_name, _channel_pid, status, names} = Channel.names(channel_pid)
-
-      new_state =
-        UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
-
-      reply =
-        if topic do
-          [
-            {:join, state, channel_name},
-            {:topic, channel_name, topic},
-            {:names, channel_name, status, names}
-          ]
-        else
-          [
-            {:join, state, channel_name},
-            {:names, channel_name, status, names}
-          ]
-        end
-
-      {:ok, reply, new_state}
-    else
-      :noop ->
-        {:ok, state}
-
-      error ->
-        error
-    end
-  end
-
-  defp do_join(channel_name, key, state, attempts \\ @max_join_attempts)
-
-  defp do_join(channel_name, _key, _state, 0) do
-    {:error, {:no_such_channel, channel_name}}
-  end
-
-  defp do_join(channel_name, key, state, attempts) do
-    case Channel.join(channel_name, state, key) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:no_such_channel, _channel_name}} ->
-        case DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
-          {:ok, pid} ->
-            Channel.join(pid, state, key)
-
-          {:error, {:already_started, _pid}} ->
-            do_join(channel_name, key, state, attempts - 1)
-
-          error ->
-            Logger.warning("Failed to create channel #{channel_name}: #{inspect(error)}")
-            error
-        end
-
-      error ->
-        error
-    end
-  end
-
   defp zip_fill([x | xs], [y | ys]), do: [{x, y} | zip_fill(xs, ys)]
-  defp zip_fill([x | xs], []), do: [{x, nil} | zip_fill(xs, [])]
+  defp zip_fill(xs, []), do: Enum.map(xs, &{&1, nil})
   defp zip_fill([], _), do: []
 end

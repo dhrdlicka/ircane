@@ -2,6 +2,7 @@ defmodule IRCane.Command.Effects do
   @moduledoc false
 
   alias IRCane.Channel
+  alias IRCane.ChannelSupervisor
   alias IRCane.User.State, as: UserState
 
   require Logger
@@ -9,6 +10,8 @@ defmodule IRCane.Command.Effects do
   @type effect ::
           {:register_nickname, String.t() | nil}
           | {:broadcast_nickname_change, UserState.t()}
+          | {:join_channel, String.t(), String.t() | nil}
+          | {:part_channel, String.t(), String.t()}
 
   @spec execute(UserState.t(), effect()) ::
           {:ok, UserState.t()} | {:ok, UserState.t(), [term()]} | {:error, term()}
@@ -43,5 +46,69 @@ defmodule IRCane.Command.Effects do
     end
 
     {:ok, state}
+  end
+
+  def execute(state, {:join_channel, channel_name, key}) do
+    with {:ok, channel_pid} <- do_join(channel_name, key, state),
+         {:ok, {channel_name, topic}} <- Channel.topic(channel_pid) do
+      {_channel_name, _channel_pid, status, names} = Channel.names(channel_pid)
+
+      new_state =
+        UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
+
+      replies =
+        if topic do
+          [
+            {:join, state, channel_name},
+            {:topic, channel_name, topic},
+            {:names, channel_name, status, names}
+          ]
+        else
+          [
+            {:join, state, channel_name},
+            {:names, channel_name, status, names}
+          ]
+        end
+
+      {:ok, new_state, replies}
+    else
+      :noop ->
+        {:ok, state}
+
+      error ->
+        {:ok, state, [error]}
+    end
+  end
+
+  def execute(state, {:part_channel, channel_name, reason}) do
+    with {:ok, channel_pid} <- Channel.part(channel_name, state, reason) do
+      {%{monitor_ref: ref}, new_state} = UserState.pop_channel(state, channel_pid)
+      Process.demonitor(ref)
+
+      {:ok, new_state, {:part, state, channel_name, reason}}
+    end
+  end
+
+  defp do_join(channel_name, key, state) do
+    case Channel.join(channel_name, state, key) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:no_such_channel, _channel_name}} ->
+        case DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
+          {:ok, pid} ->
+            Channel.join(pid, state, key)
+
+          {:error, {:already_started, pid}} ->
+            Channel.join(pid, state, key)
+
+          error ->
+            Logger.warning("Failed to create channel #{channel_name}: #{inspect(error)}")
+            error
+        end
+
+      error ->
+        error
+    end
   end
 end
