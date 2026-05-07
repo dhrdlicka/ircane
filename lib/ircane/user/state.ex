@@ -108,6 +108,14 @@ defmodule IRCane.User.State do
     Map.get(state.modes, :invisible, false)
   end
 
+  def mode(_state) do
+    []
+  end
+
+  def update_mode(state, _mode_updates) do
+    {:ok, state, [], []}
+  end
+
   def metadata(state) do
     %{
       nickname: state.nickname,

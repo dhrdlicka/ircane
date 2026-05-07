@@ -89,6 +89,29 @@ defmodule IRCane.Command.Effects do
     end
   end
 
+  def execute(state, {:get_channel_mode, target}) do
+    with {:ok, {channel_name, mode}} <- Channel.mode(target) do
+      {:ok, state, {:channel_mode_is, channel_name, mode}}
+    end
+  end
+
+  def execute(state, {:get_channel_mode_list, _target, _mode}) do
+    {:ok, state}
+  end
+
+  def execute(state, {:update_channel_mode, target, changes}) do
+    case Channel.update_mode(target, state, changes) do
+      {:ok, {_channel_name, [], errors}} ->
+        {:ok, state, errors}
+
+      {:ok, {channel_name, applied_changes, errors}} ->
+        {:ok, state, [{:channel_mode, state, channel_name, applied_changes} | errors]}
+
+      {:error, reason} ->
+        {:ok, state, [reason]}
+    end
+  end
+
   defp do_join(channel_name, key, state) do
     case Channel.join(channel_name, state, key) do
       {:ok, pid} ->

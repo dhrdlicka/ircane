@@ -57,6 +57,16 @@ defmodule IRCane.Replies.Numerics do
     numeric(005, client, "are supported by this server", tokens)
   end
 
+  def format({:umode_is, modes}, client) do
+    mode_strings =
+      modes
+      |> Enum.map(&{:add, &1})
+      |> Mode.format(@user_modes)
+      |> Enum.join()
+
+    numeric(221, client, mode_strings)
+  end
+
   def format({:luser_client, users, invisibles, servers}, client),
     do:
       numeric(
@@ -193,8 +203,14 @@ defmodule IRCane.Replies.Numerics do
   def format({:chan_o_privs_needed, channel}, client),
     do: numeric(482, client, "You're not channel operator", [channel])
 
+  def format(:umode_unknown_flag, client),
+    do: numeric(501, client, "Unknown MODE flag")
+
   def format(:users_dont_match, client),
     do: numeric(502, client, "Cant change mode for other users")
+
+  def format({:invalid_mode_param, target, mode, param}, client),
+    do: numeric(696, client, "Invalid parameter for mode", [target, <<mode::utf8>>, param])
 
   def format(_other, _client), do: nil
 
