@@ -1,37 +1,33 @@
 defmodule IRCane.Commands.Privmsg do
   @moduledoc false
-  alias IRCane.Channel
-  alias IRCane.Client
+
+  alias IRCane.Command.Plan
 
   require Logger
+
+  @behaviour IRCane.Command.Handler
 
   def handle([targets, message | message_parts], state) do
     message = Enum.join([message | message_parts], " ")
 
-    targets
-    |> String.split(",")
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.map(&dispatch(&1, message, state))
-    |> Enum.reject(&(&1 == :ok))
-    |> case do
-      [] ->
-        {:ok, state}
+    {unique_targets, self} =
+      targets
+      |> String.split(",")
+      |> Enum.uniq_by(&String.downcase/1)
+      |> Enum.split_with(&(String.downcase(&1) != String.downcase(state.nickname)))
 
-      errors ->
-        Logger.debug("PRIVMSG errors from #{state.nickname}: #{inspect(errors)}")
-        {:error, Enum.map(errors, &elem(&1, 1))}
-    end
+    {channels, users} =
+      Enum.split_with(unique_targets, fn target -> String.starts_with?(target, "#") end)
+
+    state
+    |> Plan.new()
+    |> Plan.with_effects(Enum.map(users, &{:send_user_message, &1, message}))
+    |> Plan.with_effects(Enum.map(channels, &{:send_channel_message, &1, message}))
+    |> Plan.with_replies(Enum.map(self, fn _ -> {:privmsg, state, state.nickname, message} end))
+    |> then(&{:ok, &1})
   end
 
   def handle(_, _state) do
     {:error, {:need_more_params, "PRIVMSG"}}
-  end
-
-  defp dispatch("#" <> _ = target, message, state) do
-    Channel.privmsg(target, state, message)
-  end
-
-  defp dispatch(target, message, state) do
-    Client.privmsg(target, state, message)
   end
 end

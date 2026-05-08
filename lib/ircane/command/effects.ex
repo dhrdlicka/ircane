@@ -3,6 +3,7 @@ defmodule IRCane.Command.Effects do
 
   alias IRCane.Channel
   alias IRCane.ChannelSupervisor
+  alias IRCane.Client
   alias IRCane.User.State, as: UserState
 
   require Logger
@@ -110,6 +111,28 @@ defmodule IRCane.Command.Effects do
       {:error, reason} ->
         {:ok, state, [reason]}
     end
+  end
+
+  def execute(state, {:send_user_message, target, message}) do
+    with :ok <- Client.privmsg(target, state, message) do
+      {:ok, state}
+    end
+  end
+
+  def execute(state, {:send_channel_message, target, message}) do
+    with :ok <- Channel.privmsg(target, state, message) do
+      {:ok, state}
+    end
+  end
+
+  def execute(state, {:send_user_notice, target, message}) do
+    Client.notice(target, state, message)
+    {:ok, state}
+  end
+
+  def execute(state, {:send_channel_notice, target, message}) do
+    Channel.notice(target, state, message)
+    {:ok, state}
   end
 
   defp do_join(channel_name, key, state) do
