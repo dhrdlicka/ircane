@@ -135,6 +135,18 @@ defmodule IRCane.Command.Effects do
     {:ok, state}
   end
 
+  def execute(state, {:get_channel_topic, target}) do
+    with {:ok, {channel_name, topic}} <- Channel.topic(target) do
+      {:ok, state, {:topic, channel_name, topic}}
+    end
+  end
+
+  def execute(state, {:update_channel_topic, target, topic}) do
+    with :ok <- Channel.update_topic(target, state, topic) do
+      {:ok, state, {:topic, state, target, topic}}
+    end
+  end
+
   defp do_join(channel_name, key, state) do
     case Channel.join(channel_name, state, key) do
       {:ok, pid} ->
