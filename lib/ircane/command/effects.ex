@@ -23,6 +23,7 @@ defmodule IRCane.Command.Effects do
           | {:send_channel_notice, String.t(), String.t()}
           | {:get_channel_topic, String.t()}
           | {:update_channel_topic, String.t(), String.t()}
+          | {:get_channel_names, String.t()}
 
   @spec execute(UserState.t(), effect()) ::
           {:ok, UserState.t()} | {:ok, UserState.t(), [term()]} | {:error, term()}
@@ -157,6 +158,17 @@ defmodule IRCane.Command.Effects do
     end
   end
 
+  def execute(state, {:get_channel_names, target}) do
+    {channel_name, channel_pid, status, names} = Channel.names(target)
+
+    names =
+      if Map.has_key?(state.channels, channel_pid),
+        do: names,
+        else: Enum.filter(names, &user_visible?/1)
+
+    {:ok, state, {:names, channel_name, status, names}}
+  end
+
   defp do_join(channel_name, key, state) do
     case Channel.join(channel_name, state, key) do
       {:ok, pid} ->
@@ -177,6 +189,13 @@ defmodule IRCane.Command.Effects do
 
       error ->
         error
+    end
+  end
+
+  defp user_visible?(nickname) do
+    case Registry.lookup(IRCane.UserRegistry, String.downcase(nickname)) do
+      [{_, %{invisible?: invisible?}}] -> not invisible?
+      [] -> false
     end
   end
 end
