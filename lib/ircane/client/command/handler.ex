@@ -1,7 +1,7 @@
-defmodule IRCane.Command.Handler do
+defmodule IRCane.Client.Command.Handler do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.User.State, as: UserState
 
   @callback handle(params :: [String.t()], user_state :: UserState.t()) ::

@@ -1,10 +1,10 @@
-defmodule IRCane.Commands.Mode do
+defmodule IRCane.Client.Command.Handlers.Mode do
   @moduledoc false
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.Protocol.Mode
   alias IRCane.User.State, as: UserState
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   @user_modes Application.compile_env!(:ircane, :user_modes)
   @channel_modes Application.compile_env!(:ircane, :channel_modes)

@@ -1,7 +1,7 @@
-defmodule IRCane.Command.Plan do
+defmodule IRCane.Client.Command.Plan do
   @moduledoc false
 
-  alias IRCane.Command.Effects
+  alias IRCane.Client.Command.Effects
   alias IRCane.Replies
   alias IRCane.User.State, as: UserState
 

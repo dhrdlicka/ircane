@@ -1,9 +1,9 @@
-defmodule IRCane.Commands.Topic do
+defmodule IRCane.Client.Command.Handlers.Topic do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([channel_name], state) do
     state

@@ -1,9 +1,9 @@
-defmodule IRCane.Commands.Names do
+defmodule IRCane.Client.Command.Handlers.Names do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([channels | _], state) do
     unique_channels =

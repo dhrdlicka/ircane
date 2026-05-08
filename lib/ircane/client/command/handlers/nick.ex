@@ -1,12 +1,12 @@
-defmodule IRCane.Commands.Nick do
+defmodule IRCane.Client.Command.Handlers.Nick do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.User.State, as: UserState
 
   require Logger
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([new_nickname | _], state) do
     with {:ok, new_state} <- UserState.update_nickname(state, new_nickname) do

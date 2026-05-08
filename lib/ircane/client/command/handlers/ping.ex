@@ -1,9 +1,9 @@
-defmodule IRCane.Commands.Ping do
+defmodule IRCane.Client.Command.Handlers.Ping do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([token | _], state) do
     {:ok, state |> Plan.new() |> Plan.with_reply({:pong, token})}

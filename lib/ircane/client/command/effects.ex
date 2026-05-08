@@ -1,4 +1,4 @@
-defmodule IRCane.Command.Effects do
+defmodule IRCane.Client.Command.Effects do
   @moduledoc false
 
   alias IRCane.Channel

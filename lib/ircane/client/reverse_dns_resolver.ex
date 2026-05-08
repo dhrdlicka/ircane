@@ -1,4 +1,4 @@
-defmodule IRCane.Utils.ReverseDNSResolver do
+defmodule IRCane.Client.ReverseDNSResolver do
   @moduledoc false
   require Logger
 

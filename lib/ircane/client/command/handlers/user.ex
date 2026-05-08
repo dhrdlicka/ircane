@@ -1,12 +1,12 @@
-defmodule IRCane.Commands.User do
+defmodule IRCane.Client.Command.Handlers.User do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.User.State, as: UserState
 
   require Logger
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle(_, %{registered?: true} = _state) do
     {:error, :already_registered}

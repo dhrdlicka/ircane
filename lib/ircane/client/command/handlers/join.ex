@@ -1,11 +1,11 @@
-defmodule IRCane.Commands.Join do
+defmodule IRCane.Client.Command.Handlers.Join do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
   require Logger
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle(["0"], state) do
     effects =

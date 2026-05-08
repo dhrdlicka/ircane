@@ -1,9 +1,9 @@
-defmodule IRCane.Commands.Part do
+defmodule IRCane.Client.Command.Handlers.Part do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([channels | rest], state) do
     reason = Enum.join(rest, " ")

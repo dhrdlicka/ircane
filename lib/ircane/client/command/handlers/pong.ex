@@ -1,9 +1,9 @@
-defmodule IRCane.Commands.Pong do
+defmodule IRCane.Client.Command.Handlers.Pong do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([_token | _], state) do
     {:ok, Plan.new(state)}

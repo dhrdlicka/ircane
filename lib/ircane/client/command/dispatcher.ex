@@ -1,27 +1,27 @@
-defmodule IRCane.Command.Dispatcher do
+defmodule IRCane.Client.Command.Dispatcher do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.Replies
   alias IRCane.User.State, as: UserState
 
   require Logger
 
   @command_handlers %{
-    "NICK" => IRCane.Commands.Nick,
-    "PING" => IRCane.Commands.Ping,
-    "PONG" => IRCane.Commands.Pong,
-    "USER" => IRCane.Commands.User,
-    "MOTD" => IRCane.Commands.Motd,
-    "LUSERS" => IRCane.Commands.Lusers,
-    "PRIVMSG" => IRCane.Commands.Privmsg,
-    "NOTICE" => IRCane.Commands.Notice,
-    "JOIN" => IRCane.Commands.Join,
-    "PART" => IRCane.Commands.Part,
-    "NAMES" => IRCane.Commands.Names,
-    "TOPIC" => IRCane.Commands.Topic,
-    "MODE" => IRCane.Commands.Mode,
-    "QUIT" => IRCane.Commands.Quit
+    "NICK" => IRCane.Client.Command.Handlers.Nick,
+    "PING" => IRCane.Client.Command.Handlers.Ping,
+    "PONG" => IRCane.Client.Command.Handlers.Pong,
+    "USER" => IRCane.Client.Command.Handlers.User,
+    "MOTD" => IRCane.Client.Command.Handlers.Motd,
+    "LUSERS" => IRCane.Client.Command.Handlers.Lusers,
+    "PRIVMSG" => IRCane.Client.Command.Handlers.Privmsg,
+    "NOTICE" => IRCane.Client.Command.Handlers.Notice,
+    "JOIN" => IRCane.Client.Command.Handlers.Join,
+    "PART" => IRCane.Client.Command.Handlers.Part,
+    "NAMES" => IRCane.Client.Command.Handlers.Names,
+    "TOPIC" => IRCane.Client.Command.Handlers.Topic,
+    "MODE" => IRCane.Client.Command.Handlers.Mode,
+    "QUIT" => IRCane.Client.Command.Handlers.Quit
   }
   @unregistered_commands ["PASS", "NICK", "USER"]
 

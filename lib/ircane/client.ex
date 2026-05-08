@@ -2,14 +2,14 @@ defmodule IRCane.Client do
   @moduledoc false
   alias IRCane.Channel
   alias IRCane.Channel.Role
-  alias IRCane.Command.Dispatcher
-  alias IRCane.Command.Runner
+  alias IRCane.Client.Command.Dispatcher
+  alias IRCane.Client.Command.Runner
+  alias IRCane.Client.ReverseDNSResolver
   alias IRCane.Protocol.Message
   alias IRCane.Replies
   alias IRCane.Stats
   alias IRCane.User.State, as: UserState
   alias IRCane.UserRegistry
-  alias IRCane.Utils.ReverseDNSResolver
 
   require Logger
 

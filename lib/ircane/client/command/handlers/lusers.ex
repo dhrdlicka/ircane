@@ -1,7 +1,7 @@
-defmodule IRCane.Commands.Lusers do
+defmodule IRCane.Client.Command.Handlers.Lusers do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
 
   def handle(_params, state) do
     state

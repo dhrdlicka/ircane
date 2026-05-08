@@ -1,12 +1,12 @@
-defmodule IRCane.Commands.Notice do
+defmodule IRCane.Client.Command.Handlers.Notice do
   @moduledoc false
 
-  alias IRCane.Command.Plan
+  alias IRCane.Client.Command.Plan
   alias IRCane.User.State, as: UserState
 
   require Logger
 
-  @behaviour IRCane.Command.Handler
+  @behaviour IRCane.Client.Command.Handler
 
   def handle([targets, message | message_parts], state) do
     message = Enum.join([message | message_parts], " ")
