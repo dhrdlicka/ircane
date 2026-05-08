@@ -5,6 +5,7 @@ defmodule IRCane.Command.Effects do
   alias IRCane.ChannelSupervisor
   alias IRCane.Client
   alias IRCane.Protocol.Mode
+  alias IRCane.Stats
   alias IRCane.User.State, as: UserState
 
   require Logger
@@ -24,6 +25,7 @@ defmodule IRCane.Command.Effects do
           | {:get_channel_topic, String.t()}
           | {:update_channel_topic, String.t(), String.t()}
           | {:get_channel_names, String.t()}
+          | :get_lusers_stats
 
   @spec execute(UserState.t(), effect()) ::
           {:ok, UserState.t()} | {:ok, UserState.t(), [term()]} | {:error, term()}
@@ -167,6 +169,22 @@ defmodule IRCane.Command.Effects do
         else: Enum.filter(names, &user_visible?/1)
 
     {:ok, state, {:names, channel_name, status, names}}
+  end
+
+  def execute(state, :get_lusers_stats) do
+    stats = Stats.snapshot()
+
+    reply = %{
+      users: stats.current_users,
+      invisible: 0,
+      servers: 1,
+      operators: 0,
+      unknown: stats.current_connections - stats.current_users,
+      channels: stats.current_channels,
+      max_users: stats.peak_users
+    }
+
+    {:ok, state, {:lusers, reply}}
   end
 
   defp do_join(channel_name, key, state) do
