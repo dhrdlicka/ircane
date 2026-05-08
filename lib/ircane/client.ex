@@ -5,6 +5,7 @@ defmodule IRCane.Client do
   alias IRCane.Client.Command.Dispatcher
   alias IRCane.Client.Command.Runner
   alias IRCane.Client.ReverseDNSResolver
+  alias IRCane.Client.SessionState
   alias IRCane.Protocol.Message
   alias IRCane.Replies
   alias IRCane.Stats
@@ -16,10 +17,10 @@ defmodule IRCane.Client do
   use GenServer, restart: :temporary
 
   defstruct transport: nil,
-            buffer: "",
             rdns_ref: nil,
             seen_events: :queue.new(),
             user: nil,
+            session: nil,
             connected_at_mono: nil,
             last_rx_mono: nil,
             ping_sent_at_mono: nil
@@ -27,7 +28,6 @@ defmodule IRCane.Client do
   @type t :: any()
 
   @max_line Application.compile_env!(:ircane, :max_line)
-  @event_dedup_size Application.compile_env!(:ircane, :event_dedup_size)
 
   @spec start_link(transport :: {module(), any()}) :: GenServer.on_start()
   def start_link(transport) do
@@ -84,7 +84,7 @@ defmodule IRCane.Client do
      %__MODULE__{
        transport: transport,
        user: UserState.new(self()),
-       connected_at_mono: System.monotonic_time(:millisecond)
+       session: SessionState.new()
      }, {:continue, :init}}
   end
 
@@ -119,13 +119,14 @@ defmodule IRCane.Client do
 
   @impl GenServer
   def handle_cast({:deliver, ref, _from, message}, state) do
-    if received_event?(state, ref) do
-      maybe_timeout(state)
-    else
-      state
-      |> send_message(message)
-      |> push_event(ref)
-      |> maybe_timeout()
+    case SessionState.try_push_event(state.session, ref) do
+      {:ok, updated_session} ->
+        %{state | session: updated_session}
+        |> send_message(message)
+        |> maybe_timeout()
+
+      :noop ->
+        maybe_timeout(state)
     end
   end
 
@@ -140,11 +141,9 @@ defmodule IRCane.Client do
     |> maybe_timeout()
   end
 
-  def handle_cast({:process_messages, messages}, state) do
-    new_state =
-      messages
-      |> Enum.reduce(state, &handle_line/2)
-      |> update_last_rx()
+  def handle_cast({:process_messages, messages}, %{session: session} = state) do
+    updated_session = SessionState.update_last_rx_mono(session)
+    new_state = Enum.reduce(messages, %{state | session: updated_session}, &handle_line/2)
 
     if new_state.user.quit_message do
       {:stop, :normal, new_state}
@@ -278,56 +277,38 @@ defmodule IRCane.Client do
     state
   end
 
-  defp maybe_timeout(%{user: %{registered?: false}} = state) do
-    now = System.monotonic_time(:millisecond)
-    diff = now - state.connected_at_mono
+  defp maybe_timeout(%{user: user, session: session} = state) do
+    case SessionState.heartbeat_action(session, user.registered?) do
+      {:noop, updated_session} ->
+        {:noreply, %{state | session: updated_session}, heartbeat_interval_msec()}
 
-    if diff > registration_timeout_msec() do
-      Logger.info(
-        "Client #{client_id(state)} did not register within timeout period, disconnecting"
-      )
+      {:send_ping, updated_session} ->
+        Logger.info(
+          "Client #{client_id(state)} did not send any messages within timeout period, sending PING"
+        )
 
-      updated_user = UserState.quit(state.user, "Registration timeout")
-      {:stop, :normal, %{state | user: updated_user}}
-    else
-      {:noreply, state, heartbeat_interval_msec()}
+        send_message(state, {:ping, "heartbeat"})
+        {:noreply, %{state | session: updated_session}, heartbeat_interval_msec()}
+
+      {{:disconnect, reason}, updated_session} ->
+        Logger.info("Disconnecting client #{client_id(state)} due to timeout: #{reason}")
+        updated_state = do_timeout(%{state | session: updated_session}, reason)
+        {:stop, :normal, updated_state}
     end
   end
 
-  defp maybe_timeout(%{ping_sent_at_mono: nil} = state) do
-    now = System.monotonic_time(:millisecond)
-    diff = now - state.last_rx_mono
+  defp do_timeout(state, reason) do
+    quit_message =
+      case reason do
+        :ping_timeout ->
+          diff = System.monotonic_time(:millisecond) - state.session.ping_sent_at_mono
+          "Ping timeout (#{diff / 1000} seconds)"
 
-    if diff > ping_timeout_msec() do
-      Logger.info(
-        "Client #{client_id(state)} did not send any messages within timeout period, sending PING"
-      )
+        :registration_timeout ->
+          "Registration timeout"
+      end
 
-      send_message(state, {:ping, "heartbeat"})
-      {:noreply, %{state | ping_sent_at_mono: now}, heartbeat_interval_msec()}
-    else
-      {:noreply, state, heartbeat_interval_msec()}
-    end
-  end
-
-  defp maybe_timeout(state) do
-    now = System.monotonic_time(:millisecond)
-    diff = now - state.ping_sent_at_mono
-
-    if diff > ping_timeout_msec() do
-      Logger.info(
-        "Client #{client_id(state)} did not respond to PING within timeout period, disconnecting"
-      )
-
-      updated_user = UserState.quit(state.user, "Ping timeout (#{diff / 1000} seconds)")
-      {:stop, :normal, %{state | user: updated_user}}
-    else
-      {:noreply, state, heartbeat_interval_msec()}
-    end
-  end
-
-  defp update_last_rx(state) do
-    %{state | last_rx_mono: System.monotonic_time(:millisecond), ping_sent_at_mono: nil}
+    %{state | user: UserState.quit(state.user, quit_message)}
   end
 
   defp send_message(state, message) do
@@ -369,23 +350,6 @@ defmodule IRCane.Client do
     end
   end
 
-  defp received_event?(state, event_id) do
-    :queue.member(event_id, state.seen_events)
-  end
-
-  defp push_event(%{seen_events: events} = state, event_id) do
-    queue = :queue.in(event_id, events)
-
-    if :queue.len(queue) > @event_dedup_size do
-      {_, new_queue} = :queue.out(queue)
-      %{state | seen_events: new_queue}
-    else
-      %{state | seen_events: queue}
-    end
-  end
-
-  defp registration_timeout_msec, do: Application.fetch_env!(:ircane, :registration_timeout_msec)
-  defp ping_timeout_msec, do: Application.fetch_env!(:ircane, :ping_timeout_msec)
   defp heartbeat_interval_msec, do: Application.fetch_env!(:ircane, :heartbeat_interval_msec)
 
   defp client_id(%{user: user}), do: client_id(user)
