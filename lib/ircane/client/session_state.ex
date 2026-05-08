@@ -4,15 +4,13 @@ defmodule IRCane.Client.SessionState do
   defstruct seen_events: :queue.new(),
             connected_at_mono: nil,
             last_rx_mono: nil,
-            ping_sent_at_mono: nil,
-            rdns_ref: nil
+            ping_sent_at_mono: nil
 
   @type t :: %__MODULE__{
           seen_events: :queue.queue(),
           connected_at_mono: non_neg_integer() | nil,
           last_rx_mono: non_neg_integer() | nil,
-          ping_sent_at_mono: non_neg_integer() | nil,
-          rdns_ref: reference() | nil
+          ping_sent_at_mono: non_neg_integer() | nil
         }
 
   @event_dedup_size Application.compile_env!(:ircane, :event_dedup_size)

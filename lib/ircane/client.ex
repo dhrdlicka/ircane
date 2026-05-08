@@ -18,12 +18,8 @@ defmodule IRCane.Client do
 
   defstruct transport: nil,
             rdns_ref: nil,
-            seen_events: :queue.new(),
             user: nil,
-            session: nil,
-            connected_at_mono: nil,
-            last_rx_mono: nil,
-            ping_sent_at_mono: nil
+            session: nil
 
   @type t :: any()
 
