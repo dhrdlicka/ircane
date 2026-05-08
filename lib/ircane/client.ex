@@ -221,9 +221,9 @@ defmodule IRCane.Client do
     Logger.debug("[#{client_id(state)}] << #{String.trim(line)}")
 
     case Message.parse(line) do
-      {:ok, %{command: command, params: params}} ->
-        command
-        |> handle_command(params, state)
+      {:ok, message} ->
+        message
+        |> handle_command(state)
         |> maybe_register()
 
       {:error, reason} ->
@@ -232,8 +232,8 @@ defmodule IRCane.Client do
     end
   end
 
-  defp handle_command(command, params, state) do
-    with {:ok, plan} <- Dispatcher.dispatch(command, params, state.user),
+  defp handle_command(message, state) do
+    with {:ok, plan} <- Dispatcher.dispatch(message, state.user),
          {:ok, replies, new_state} <- Runner.run(plan) do
       send_message(%{state | user: new_state}, replies)
     else
@@ -242,7 +242,8 @@ defmodule IRCane.Client do
     end
   end
 
-  defp cmd(state, command, params), do: handle_command(command, params, state)
+  defp cmd(state, command, params \\ []),
+    do: handle_command(%Message{command: command, params: params}, state)
 
   defp maybe_register(%{transport: {mod, ref}, rdns_ref: nil, user: user} = state) do
     case UserState.try_register(user) do
@@ -261,8 +262,8 @@ defmodule IRCane.Client do
 
         %{state | user: new_state}
         |> send_message([:welcome, :your_host, :created, :my_info, :i_support])
-        |> cmd("LUSERS", [])
-        |> cmd("MOTD", [])
+        |> cmd("LUSERS")
+        |> cmd("MOTD")
 
       :noop ->
         state

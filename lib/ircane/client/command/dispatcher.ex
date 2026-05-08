@@ -2,6 +2,7 @@ defmodule IRCane.Client.Command.Dispatcher do
   @moduledoc false
 
   alias IRCane.Client.Command.Plan
+  alias IRCane.Protocol.Message
   alias IRCane.Replies
   alias IRCane.User.State, as: UserState
 
@@ -25,14 +26,19 @@ defmodule IRCane.Client.Command.Dispatcher do
   }
   @unregistered_commands ["PASS", "NICK", "USER"]
 
-  @spec dispatch(String.t(), [String.t()], UserState.t()) ::
-          {:ok, Plan.t()} | {:error, Replies.reply()}
-  def dispatch(command, _params, %{registered?: false} = _user_state)
-      when command not in @unregistered_commands do
+  @spec dispatch(Message.t(), UserState.t()) :: {:ok, Plan.t()} | {:error, Replies.reply()}
+  def dispatch(%Message{command: command, params: params}, user_state) do
+    command
+    |> String.upcase()
+    |> do_dispatch(params, user_state)
+  end
+
+  defp do_dispatch(command, _params, %{registered?: false} = _user_state)
+       when command not in @unregistered_commands do
     {:error, :not_registered}
   end
 
-  def dispatch(command, params, user_state) do
+  defp do_dispatch(command, params, user_state) do
     case Map.get(@command_handlers, String.upcase(command)) do
       nil ->
         Logger.debug("Unknown command from #{client_id(user_state)}: #{command}")
