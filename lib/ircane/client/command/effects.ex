@@ -70,19 +70,12 @@ defmodule IRCane.Client.Command.Effects do
       new_state =
         UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
 
+      join_reply = {:join, state, channel_name}
+      topic_reply = {:topic, channel_name, topic}
+      names_reply = {:names, channel_name, status, names}
+
       replies =
-        if topic do
-          [
-            {:join, state, channel_name},
-            {:topic, channel_name, topic},
-            {:names, channel_name, status, names}
-          ]
-        else
-          [
-            {:join, state, channel_name},
-            {:names, channel_name, status, names}
-          ]
-        end
+        if topic, do: [join_reply, topic_reply, names_reply], else: [join_reply, names_reply]
 
       {:ok, new_state, replies}
     else
@@ -150,7 +143,11 @@ defmodule IRCane.Client.Command.Effects do
 
   def execute(state, {:get_channel_topic, target}) do
     with {:ok, {channel_name, topic}} <- Channel.topic(target) do
-      {:ok, state, {:topic, channel_name, topic}}
+      if topic do
+        {:ok, state, {:topic, channel_name, topic}}
+      else
+        {:ok, state, {:no_topic, channel_name}}
+      end
     end
   end
 
