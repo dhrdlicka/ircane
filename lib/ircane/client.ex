@@ -26,8 +26,6 @@ defmodule IRCane.Client do
 
   @type t :: any()
 
-  @update_idle_commands ["JOIN", "PART", "PRIVMSG", "NICK", "MODE", "AWAY"]
-
   @max_line Application.compile_env!(:ircane, :max_line)
   @event_dedup_size Application.compile_env!(:ircane, :event_dedup_size)
 
@@ -232,7 +230,6 @@ defmodule IRCane.Client do
         command
         |> handle_command(params, state)
         |> maybe_register()
-        |> maybe_update_idle(command)
 
       {:error, reason} ->
         Logger.debug("Failed to parse message from #{client_id(state)}: #{inspect(reason)}")
@@ -328,12 +325,6 @@ defmodule IRCane.Client do
       {:noreply, state, heartbeat_interval_msec()}
     end
   end
-
-  defp maybe_update_idle(state, command) when command in @update_idle_commands do
-    %{state | user: UserState.update_idle(state.user)}
-  end
-
-  defp maybe_update_idle(state, _command), do: state
 
   defp update_last_rx(state) do
     %{state | last_rx_mono: System.monotonic_time(:millisecond), ping_sent_at_mono: nil}

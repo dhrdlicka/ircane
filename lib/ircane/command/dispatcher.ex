@@ -39,18 +39,9 @@ defmodule IRCane.Command.Dispatcher do
         {:error, {:unknown_command, command}}
 
       handler ->
-        params
-        |> handler.handle(user_state)
-        |> maybe_convert_legacy_to_plan()
+        handler.handle(params, user_state)
     end
   end
-
-  defp maybe_convert_legacy_to_plan({:ok, %UserState{} = state}), do: {:ok, Plan.new(state)}
-
-  defp maybe_convert_legacy_to_plan({:ok, replies, %UserState{} = state}),
-    do: {:ok, Plan.new(state) |> Plan.with_replies(replies)}
-
-  defp maybe_convert_legacy_to_plan(other), do: other
 
   defp client_id(%{user: user}), do: client_id(user)
 

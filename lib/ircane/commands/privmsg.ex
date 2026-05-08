@@ -2,6 +2,7 @@ defmodule IRCane.Commands.Privmsg do
   @moduledoc false
 
   alias IRCane.Command.Plan
+  alias IRCane.User.State, as: UserState
 
   require Logger
 
@@ -20,6 +21,7 @@ defmodule IRCane.Commands.Privmsg do
       Enum.split_with(unique_targets, fn target -> String.starts_with?(target, "#") end)
 
     state
+    |> UserState.update_idle()
     |> Plan.new()
     |> Plan.with_effects(Enum.map(users, &{:send_user_message, &1, message}))
     |> Plan.with_effects(Enum.map(channels, &{:send_channel_message, &1, message}))
