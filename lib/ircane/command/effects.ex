@@ -4,6 +4,7 @@ defmodule IRCane.Command.Effects do
   alias IRCane.Channel
   alias IRCane.ChannelSupervisor
   alias IRCane.Client
+  alias IRCane.Protocol.Mode
   alias IRCane.User.State, as: UserState
 
   require Logger
@@ -13,6 +14,15 @@ defmodule IRCane.Command.Effects do
           | {:broadcast_nickname_change, UserState.t()}
           | {:join_channel, String.t(), String.t() | nil}
           | {:part_channel, String.t(), String.t()}
+          | {:get_channel_mode, String.t()}
+          | {:get_channel_mode_list, String.t(), atom()}
+          | {:update_channel_mode, String.t(), [Mode.change()]}
+          | {:send_user_message, String.t(), String.t()}
+          | {:send_channel_message, String.t(), String.t()}
+          | {:send_user_notice, String.t(), String.t()}
+          | {:send_channel_notice, String.t(), String.t()}
+          | {:get_channel_topic, String.t()}
+          | {:update_channel_topic, String.t(), String.t()}
 
   @spec execute(UserState.t(), effect()) ::
           {:ok, UserState.t()} | {:ok, UserState.t(), [term()]} | {:error, term()}
