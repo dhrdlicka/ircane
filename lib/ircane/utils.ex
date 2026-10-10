@@ -6,4 +6,13 @@ defmodule IRCane.Utils do
       _ -> :error
     end
   end
+
+  @spec valid_channel_name?(String.t()) :: boolean()
+  def valid_channel_name?(name) do
+    cond do
+      not String.starts_with?(name, ["#"]) -> false
+      String.contains?(name, [" ", ",", "\a"]) -> false
+      true -> true
+    end
+  end
 end

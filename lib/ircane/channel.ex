@@ -18,137 +18,68 @@ defmodule IRCane.Channel do
   def start_link(opts) do
     channel_name = Keyword.fetch!(opts, :name)
     Logger.info("Creating channel: #{channel_name}")
-    GenServer.start_link(__MODULE__, opts, name: via_tuple(channel_name))
+    GenServer.start_link(__MODULE__, opts, name: via(channel_name))
   end
 
   @spec broadcast_nick(GenServer.server(), reference(), UserState.t(), String.t()) :: :ok
-  def broadcast_nick(pid, ref, from, new_nickname) do
-    GenServer.cast(pid, {:broadcast_nick, ref, from, new_nickname})
+  def broadcast_nick(server, ref, from, new_nickname) do
+    GenServer.cast(server, {:broadcast_nick, ref, from, new_nickname})
   end
 
   @spec broadcast_quit(GenServer.server(), UserState.t(), String.t()) :: :ok
-  def broadcast_quit(pid, from, quit_message) do
-    GenServer.cast(pid, {:broadcast_quit, from, quit_message})
+  def broadcast_quit(server, from, quit_message) do
+    GenServer.cast(server, {:broadcast_quit, from, quit_message})
   end
 
-  @spec join(String.t() | GenServer.server(), UserState.t(), String.t() | nil) ::
+  @spec join(GenServer.server(), UserState.t(), String.t() | nil) ::
           {:ok, pid()} | :noop | {:error, term()}
-  def join(channel_name, client, key) when is_binary(channel_name) do
-    join(via_tuple(channel_name), client, key)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
+  def join(server, client, key) do
+    GenServer.call(server, {:join, client, key})
   end
 
-  def join(pid, client, key) do
-    GenServer.call(pid, {:join, client, key})
+  @spec part(GenServer.server(), UserState.t(), String.t()) :: {:ok, pid()} | {:error, term()}
+  def part(server, client, reason) do
+    GenServer.call(server, {:part, client, reason})
   end
 
-  @spec part(String.t() | GenServer.server(), UserState.t(), String.t()) ::
-          {:ok, pid()} | {:error, term()}
-  def part(channel_name, client, reason) when is_binary(channel_name) do
-    part(via_tuple(channel_name), client, reason)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
+  @spec names(GenServer.server()) :: {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
+  def names(server) do
+    GenServer.call(server, :names)
   end
 
-  def part(pid, client, reason) do
-    GenServer.call(pid, {:part, client, reason})
+  @spec privmsg(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
+  def privmsg(server, client, message) do
+    GenServer.call(server, {:privmsg, client, message})
   end
 
-  @spec names(String.t() | GenServer.server()) ::
-          {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
-  def names(channel_name) when is_binary(channel_name) do
-    names(via_tuple(channel_name))
-  catch
-    :exit, {:noproc, _} ->
-      {channel_name, :none, []}
+  @spec notice(GenServer.server(), UserState.t(), String.t()) :: :ok
+  def notice(server, client, message) do
+    GenServer.cast(server, {:notice, client, message})
   end
 
-  def names(pid) do
-    GenServer.call(pid, :names)
+  @spec topic(GenServer.server()) :: {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
+  def topic(server) do
+    GenServer.call(server, :topic)
   end
 
-  @spec privmsg(String.t() | GenServer.server(), UserState.t(), String.t()) ::
-          :ok | {:error, term()}
-  def privmsg(channel_name, client, message) when is_binary(channel_name) do
-    privmsg(via_tuple(channel_name), client, message)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
+  @spec update_topic(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
+  def update_topic(server, client, new_topic) do
+    GenServer.call(server, {:update_topic, client, new_topic})
   end
 
-  def privmsg(pid, client, message) do
-    GenServer.call(pid, {:privmsg, client, message})
+  @spec mode(GenServer.server()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
+  def mode(server) do
+    GenServer.call(server, :mode)
   end
 
-  @spec notice(String.t() | GenServer.server(), UserState.t(), String.t()) ::
-          :ok | {:error, term()}
-  def notice(channel_name, client, message) when is_binary(channel_name) do
-    notice(via_tuple(channel_name), client, message)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
-  end
-
-  def notice(pid, client, message) do
-    GenServer.cast(pid, {:notice, client, message})
-  end
-
-  @spec topic(String.t() | GenServer.server()) ::
-          {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
-  def topic(channel_name) when is_binary(channel_name) do
-    topic(via_tuple(channel_name))
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
-  end
-
-  def topic(pid) do
-    GenServer.call(pid, :topic)
-  end
-
-  @spec update_topic(String.t() | GenServer.server(), UserState.t(), String.t()) ::
-          :ok | {:error, term()}
-  def update_topic(channel_name, client, new_topic) when is_binary(channel_name) do
-    update_topic(via_tuple(channel_name), client, new_topic)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
-  end
-
-  def update_topic(pid, client, new_topic) do
-    GenServer.call(pid, {:update_topic, client, new_topic})
-  end
-
-  @spec mode(String.t() | GenServer.server()) ::
-          {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
-  def mode(channel_name) when is_binary(channel_name) do
-    mode(via_tuple(channel_name))
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
-  end
-
-  def mode(pid) do
-    GenServer.call(pid, :mode)
-  end
-
-  @spec update_mode(String.t() | GenServer.server(), UserState.t(), [Mode.mode_change()]) ::
+  @spec update_mode(GenServer.server(), UserState.t(), [Mode.mode_change()]) ::
           {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
-  def update_mode(channel_name, client, updates) when is_binary(channel_name) do
-    update_mode(via_tuple(channel_name), client, updates)
-  catch
-    :exit, {:noproc, _} ->
-      {:error, {:no_such_channel, channel_name}}
+  def update_mode(server, client, updates) do
+    GenServer.call(server, {:update_mode, client, updates})
   end
 
-  def update_mode(pid, client, updates) do
-    GenServer.call(pid, {:update_mode, client, updates})
-  end
-
-  defp via_tuple(channel_name) do
+  @spec via(String.t()) :: GenServer.name()
+  def via(channel_name) do
     {:via, Registry, {ChannelRegistry, String.downcase(channel_name)}}
   end
 

@@ -1,7 +1,7 @@
 defmodule IRCane.Client do
   @moduledoc false
-  alias IRCane.Channel
   alias IRCane.Channel.Role
+  alias IRCane.Channels
   alias IRCane.Client.Command.Dispatcher
   alias IRCane.Client.Command.Runner
   alias IRCane.Client.ReverseDNSResolver
@@ -90,7 +90,7 @@ defmodule IRCane.Client do
 
     state.user.channels
     |> Map.keys()
-    |> Enum.each(&Channel.broadcast_quit(&1, state.user, message))
+    |> Enum.each(&Channels.broadcast_quit(&1, state.user, message))
 
     send_message(state, {:error, "Closing link: (#{host_mask(state)}) [#{message}]"})
 

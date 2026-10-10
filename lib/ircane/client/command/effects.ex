@@ -1,8 +1,7 @@
 defmodule IRCane.Client.Command.Effects do
   @moduledoc false
 
-  alias IRCane.Channel
-  alias IRCane.ChannelSupervisor
+  alias IRCane.Channels
   alias IRCane.Client
   alias IRCane.Protocol.Mode
   alias IRCane.Stats
@@ -56,16 +55,16 @@ defmodule IRCane.Client.Command.Effects do
 
       state.channels
       |> Map.keys()
-      |> Enum.each(&Channel.broadcast_nick(&1, ref, old_state, state.nickname))
+      |> Enum.each(&Channels.broadcast_nick(&1, ref, old_state, state.nickname))
     end
 
     {:ok, state}
   end
 
   def execute(state, {:join_channel, channel_name, key}) do
-    with {:ok, channel_pid} <- do_join(channel_name, key, state),
-         {:ok, {channel_name, topic}} <- Channel.topic(channel_pid) do
-      {_channel_name, _channel_pid, status, names} = Channel.names(channel_pid)
+    with {:ok, channel_pid} <- Channels.join(channel_name, state, key),
+         {:ok, {channel_name, topic}} <- Channels.topic(channel_name) do
+      {_channel_name, _channel_pid, status, names} = Channels.names(channel_name)
 
       new_state =
         UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
@@ -82,13 +81,13 @@ defmodule IRCane.Client.Command.Effects do
       :noop ->
         {:ok, state}
 
-      error ->
-        {:ok, state, [error]}
+      {:error, reason} ->
+        {:ok, state, [reason]}
     end
   end
 
   def execute(state, {:part_channel, channel_name, reason}) do
-    with {:ok, channel_pid} <- Channel.part(channel_name, state, reason) do
+    with {:ok, channel_pid} <- Channels.part(channel_name, state, reason) do
       {%{monitor_ref: ref}, new_state} = UserState.pop_channel(state, channel_pid)
       Process.demonitor(ref)
 
@@ -97,7 +96,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:get_channel_mode, target}) do
-    with {:ok, {channel_name, mode}} <- Channel.mode(target) do
+    with {:ok, {channel_name, mode}} <- Channels.mode(target) do
       {:ok, state, {:channel_mode_is, channel_name, mode}}
     end
   end
@@ -107,7 +106,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:update_channel_mode, target, changes}) do
-    case Channel.update_mode(target, state, changes) do
+    case Channels.update_mode(target, state, changes) do
       {:ok, {_channel_name, [], errors}} ->
         {:ok, state, errors}
 
@@ -126,7 +125,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:send_channel_message, target, message}) do
-    with :ok <- Channel.privmsg(target, state, message) do
+    with :ok <- Channels.privmsg(target, state, message) do
       {:ok, state}
     end
   end
@@ -137,12 +136,12 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:send_channel_notice, target, message}) do
-    Channel.notice(target, state, message)
+    Channels.notice(target, state, message)
     {:ok, state}
   end
 
   def execute(state, {:get_channel_topic, target}) do
-    with {:ok, {channel_name, topic}} <- Channel.topic(target) do
+    with {:ok, {channel_name, topic}} <- Channels.topic(target) do
       if topic do
         {:ok, state, {:topic, channel_name, topic}}
       else
@@ -152,13 +151,13 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:update_channel_topic, target, topic}) do
-    with :ok <- Channel.update_topic(target, state, topic) do
+    with :ok <- Channels.update_topic(target, state, topic) do
       {:ok, state, {:topic, state, target, topic}}
     end
   end
 
   def execute(state, {:get_channel_names, target}) do
-    {channel_name, channel_pid, status, names} = Channel.names(target)
+    {channel_name, channel_pid, status, names} = Channels.names(target)
 
     names =
       if Map.has_key?(state.channels, channel_pid),
@@ -182,29 +181,6 @@ defmodule IRCane.Client.Command.Effects do
     }
 
     {:ok, state, {:lusers, reply}}
-  end
-
-  defp do_join(channel_name, key, state) do
-    case Channel.join(channel_name, state, key) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:no_such_channel, _channel_name}} ->
-        case DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
-          {:ok, pid} ->
-            Channel.join(pid, state, key)
-
-          {:error, {:already_started, pid}} ->
-            Channel.join(pid, state, key)
-
-          error ->
-            Logger.warning("Failed to create channel #{channel_name}: #{inspect(error)}")
-            error
-        end
-
-      error ->
-        error
-    end
   end
 
   defp user_visible?(nickname) do

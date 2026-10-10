@@ -6,6 +6,7 @@ defmodule IRCane.Channel.State do
   alias IRCane.Channel.Topic
   alias IRCane.Protocol.Mode
   alias IRCane.User.State, as: UserState
+  alias IRCane.Utils
 
   defstruct name: nil,
             topic: nil,
@@ -33,11 +34,10 @@ defmodule IRCane.Channel.State do
 
   @spec new(String.t()) :: {:ok, t()} | {:error, atom()}
   def new(name) do
-    with true <- String.starts_with?(name, ["#"]),
-         false <- String.contains?(name, [" ", ",", "\a"]) do
+    if Utils.valid_channel_name?(name) do
       {:ok, %__MODULE__{name: name}}
     else
-      _ -> {:error, {:bad_chan_mask, name}}
+      {:error, {:bad_chan_mask, name}}
     end
   end
 

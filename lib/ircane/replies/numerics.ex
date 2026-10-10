@@ -173,6 +173,9 @@ defmodule IRCane.Replies.Numerics do
   def format({:nickname_in_use, nickname}, client),
     do: numeric(433, client, "Nickname is already in use", [nickname])
 
+  def format({:unavail_resource, name}, client),
+    do: numeric(437, client, "Nickname/channel is temporarily unavailable", [name])
+
   def format(:not_registered, client),
     do: numeric(451, client, "You have not registered")
 
