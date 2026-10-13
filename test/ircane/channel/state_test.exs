@@ -288,7 +288,7 @@ defmodule IRCane.Channel.StateTest do
       outsider = build(:user_state, pid: build(:pid), nickname: "outsider")
       assert {:ok, prejoined_with_other} = ChannelState.join(channel, other_client, make_ref())
 
-      assert {:public, members} = ChannelState.names(prejoined_with_other, outsider.pid)
+      assert {:public, members} = ChannelState.names(prejoined_with_other, outsider)
       assert Enum.sort(Enum.map(members, & &1.nickname)) == ["nick", "other"]
     end
 
@@ -304,7 +304,7 @@ defmodule IRCane.Channel.StateTest do
         | modes: Map.put(prejoined_with_other.modes, :secret?, true)
       }
 
-      assert {:secret, members} = ChannelState.names(secret_state, client.pid)
+      assert {:secret, members} = ChannelState.names(secret_state, client)
       assert Enum.sort(Enum.map(members, & &1.nickname)) == ["nick", "other"]
     end
 
@@ -312,7 +312,7 @@ defmodule IRCane.Channel.StateTest do
       outsider = build(:user_state, pid: build(:pid), nickname: "outsider")
       secret_state = %{channel | modes: Map.put(channel.modes, :secret?, true)}
 
-      assert {:none, []} = ChannelState.names(secret_state, outsider.pid)
+      assert {:none, []} = ChannelState.names(secret_state, outsider)
     end
   end
 
@@ -322,14 +322,14 @@ defmodule IRCane.Channel.StateTest do
       topic = build(:topic, topic: "hello")
       state = %{channel | topic: topic}
 
-      assert {:ok, ^topic} = ChannelState.topic(state, outsider.pid)
+      assert {:ok, ^topic} = ChannelState.topic(state, outsider)
     end
 
     test "returns the topic for members in a secret channel", %{channel: channel, client: client} do
       topic = build(:topic, topic: "secret")
       state = %{channel | topic: topic, modes: Map.put(channel.modes, :secret?, true)}
 
-      assert {:ok, ^topic} = ChannelState.topic(state, client.pid)
+      assert {:ok, ^topic} = ChannelState.topic(state, client)
     end
 
     test "returns no_such_channel for outsiders in a secret channel", %{channel: channel} do
@@ -337,7 +337,7 @@ defmodule IRCane.Channel.StateTest do
       secret_state = %{channel | modes: Map.put(channel.modes, :secret?, true)}
 
       assert {:error, {:no_such_channel, "#prejoined"}} =
-               ChannelState.topic(secret_state, outsider.pid)
+               ChannelState.topic(secret_state, outsider)
     end
   end
 
@@ -345,7 +345,7 @@ defmodule IRCane.Channel.StateTest do
     test "returns visible modes for public channels", %{channel: channel} do
       outsider = build(:user_state, pid: build(:pid), nickname: "outsider")
 
-      assert {:ok, modes} = ChannelState.mode(channel, outsider.pid)
+      assert {:ok, modes} = ChannelState.mode(channel, outsider)
       assert Enum.sort(modes) == Enum.sort([:protected_topic, :no_external_messages])
     end
 
@@ -358,7 +358,7 @@ defmodule IRCane.Channel.StateTest do
             |> Map.put(:moderated?, true)
       }
 
-      assert {:ok, modes} = ChannelState.mode(state, client.pid)
+      assert {:ok, modes} = ChannelState.mode(state, client)
 
       assert Enum.sort(modes) ==
                Enum.sort([:secret, :moderated, :protected_topic, :no_external_messages])
@@ -369,7 +369,7 @@ defmodule IRCane.Channel.StateTest do
       secret_state = %{channel | modes: Map.put(channel.modes, :secret?, true)}
 
       assert {:error, {:no_such_channel, "#prejoined"}} =
-               ChannelState.mode(secret_state, outsider.pid)
+               ChannelState.mode(secret_state, outsider)
     end
   end
 

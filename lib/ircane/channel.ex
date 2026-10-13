@@ -42,9 +42,10 @@ defmodule IRCane.Channel do
     GenServer.call(server, {:part, client, reason})
   end
 
-  @spec names(GenServer.server()) :: {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
-  def names(server) do
-    GenServer.call(server, :names)
+  @spec names(GenServer.server(), UserState.t()) ::
+          {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
+  def names(server, client) do
+    GenServer.call(server, {:names, client})
   end
 
   @spec privmsg(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
@@ -57,9 +58,10 @@ defmodule IRCane.Channel do
     GenServer.cast(server, {:notice, client, message})
   end
 
-  @spec topic(GenServer.server()) :: {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
-  def topic(server) do
-    GenServer.call(server, :topic)
+  @spec topic(GenServer.server(), UserState.t()) ::
+          {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
+  def topic(server, client) do
+    GenServer.call(server, {:topic, client})
   end
 
   @spec update_topic(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
@@ -67,9 +69,10 @@ defmodule IRCane.Channel do
     GenServer.call(server, {:update_topic, client, new_topic})
   end
 
-  @spec mode(GenServer.server()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
-  def mode(server) do
-    GenServer.call(server, :mode)
+  @spec mode(GenServer.server(), UserState.t()) ::
+          {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
+  def mode(server, client) do
+    GenServer.call(server, {:mode, client})
   end
 
   @spec update_mode(GenServer.server(), UserState.t(), [Mode.mode_change()]) ::
@@ -125,8 +128,8 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:names, {pid, _tag}, state) do
-    {status, names} = ChannelState.names(state, pid)
+  def handle_call({:names, client}, _from, state) do
+    {status, names} = ChannelState.names(state, client)
     {:reply, {state.name, self(), status, names}, state}
   end
 
@@ -158,8 +161,8 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:topic, {pid, _tag}, state) do
-    case ChannelState.topic(state, pid) do
+  def handle_call({:topic, client}, _from, state) do
+    case ChannelState.topic(state, client) do
       {:ok, topic} ->
         {:reply, {:ok, {state.name, topic}}, state}
 
@@ -168,8 +171,8 @@ defmodule IRCane.Channel do
     end
   end
 
-  def handle_call(:mode, {pid, _tag}, state) do
-    case ChannelState.mode(state, pid) do
+  def handle_call({:mode, client}, _from, state) do
+    case ChannelState.mode(state, client) do
       {:ok, modes} ->
         {:reply, {:ok, {state.name, modes}}, state}
 

@@ -63,8 +63,8 @@ defmodule IRCane.Client.Command.Effects do
 
   def execute(state, {:join_channel, channel_name, key}) do
     with {:ok, channel_pid} <- Channels.join(channel_name, state, key),
-         {:ok, {channel_name, topic}} <- Channels.topic(channel_name) do
-      {_channel_name, _channel_pid, status, names} = Channels.names(channel_name)
+         {:ok, {channel_name, topic}} <- Channels.topic(channel_name, state) do
+      {_channel_name, _channel_pid, status, names} = Channels.names(channel_name, state)
 
       new_state =
         UserState.add_channel(state, channel_pid, channel_name, Process.monitor(channel_pid))
@@ -96,7 +96,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:get_channel_mode, target}) do
-    with {:ok, {channel_name, mode}} <- Channels.mode(target) do
+    with {:ok, {channel_name, mode}} <- Channels.mode(target, state) do
       {:ok, state, {:channel_mode_is, channel_name, mode}}
     end
   end
@@ -141,7 +141,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:get_channel_topic, target}) do
-    with {:ok, {channel_name, topic}} <- Channels.topic(target) do
+    with {:ok, {channel_name, topic}} <- Channels.topic(target, state) do
       if topic do
         {:ok, state, {:topic, channel_name, topic}}
       else
@@ -157,7 +157,7 @@ defmodule IRCane.Client.Command.Effects do
   end
 
   def execute(state, {:get_channel_names, target}) do
-    {channel_name, channel_pid, status, names} = Channels.names(target)
+    {channel_name, channel_pid, status, names} = Channels.names(target, state)
 
     names =
       if Map.has_key?(state.channels, channel_pid),

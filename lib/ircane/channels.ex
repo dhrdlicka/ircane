@@ -51,10 +51,10 @@ defmodule IRCane.Channels do
   def part(channel_name, client, reason),
     do: safe_call(channel_name, &Channel.part(&1, client, reason))
 
-  @spec names(String.t()) ::
+  @spec names(String.t(), UserState.t()) ::
           {String.t(), pid() | nil, :public | :secret | :none, [Membership.t()]}
-  def names(channel_name) do
-    with {:error, _} <- safe_call(channel_name, &Channel.names/1) do
+  def names(channel_name, client) do
+    with {:error, _} <- safe_call(channel_name, &Channel.names(&1, client)) do
       {channel_name, nil, :none, []}
     end
   end
@@ -69,15 +69,16 @@ defmodule IRCane.Channels do
     :ok
   end
 
-  @spec topic(String.t()) :: {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
-  def topic(channel_name), do: safe_call(channel_name, &Channel.topic/1)
+  @spec topic(String.t(), UserState.t()) ::
+          {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
+  def topic(channel_name, client), do: safe_call(channel_name, &Channel.topic(&1, client))
 
   @spec update_topic(String.t(), UserState.t(), String.t()) :: :ok | {:error, term()}
   def update_topic(channel_name, client, new_topic),
     do: safe_call(channel_name, &Channel.update_topic(&1, client, new_topic))
 
-  @spec mode(String.t()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
-  def mode(channel_name), do: safe_call(channel_name, &Channel.mode/1)
+  @spec mode(String.t(), UserState.t()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
+  def mode(channel_name, client), do: safe_call(channel_name, &Channel.mode(&1, client))
 
   @spec update_mode(String.t(), UserState.t(), [Mode.mode_change()]) ::
           {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
