@@ -29,11 +29,6 @@ defmodule IRCane.Channel do
     GenServer.cast(server, {:broadcast_nick, ref, from, new_nickname})
   end
 
-  @spec broadcast_quit(GenServer.server(), UserState.t(), String.t()) :: :ok
-  def broadcast_quit(server, from, quit_message) do
-    GenServer.cast(server, {:broadcast_quit, from, quit_message})
-  end
-
   @spec via(String.t()) :: GenServer.name()
   def via(channel_name) do
     {:via, Registry, {ChannelRegistry, String.downcase(channel_name)}}
@@ -73,18 +68,6 @@ defmodule IRCane.Channel do
     do_broadcast(ref, client, {:nick, client, new_nickname}, state)
 
     {:noreply, ChannelState.update_member_nickname(state, client)}
-  end
-
-  def handle_cast({:broadcast_quit, client, quit_message}, state) do
-    Logger.debug("Broadcasting quit in #{state.name}: #{client.nickname} (#{quit_message})")
-    do_broadcast({:quit, client.pid}, client, {:quit, client, quit_message}, state)
-
-    {new_state, member} = ChannelState.quit(state, client.pid)
-    Process.demonitor(member.monitor_ref)
-
-    update_registry_metadata(new_state)
-
-    terminate_if_empty(new_state)
   end
 
   def handle_cast({:notice, client, message}, state) do
@@ -128,11 +111,15 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_info({:DOWN, _ref, :process, client_pid, _reason}, state) do
+  def handle_info({:DOWN, _ref, :process, client_pid, reason}, state) do
     {new_state, member} = ChannelState.quit(state, client_pid)
 
     if member do
-      quit_message = "User process terminated unexpectedly"
+      quit_message =
+        case reason do
+          {:shutdown, {:quit, quit_message}} -> quit_message
+          _ -> "User process terminated unexpectedly"
+        end
 
       Logger.debug("Broadcasting quit in #{state.name}: #{member.nickname} (#{quit_message})")
 

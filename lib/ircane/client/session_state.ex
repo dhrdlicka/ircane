@@ -21,15 +21,15 @@ defmodule IRCane.Client.SessionState do
   end
 
   @spec heartbeat_action(t(), boolean()) ::
-          {{:disconnect, :ping_timeout | :registration_timeout} | :send_ping | :noop, t()}
-  def heartbeat_action(%{connected_at_mono: connected_at_mono} = state, false = _registered?) do
+          :noop | {:disconnect, :ping_timeout | :registration_timeout} | {:send_ping, t()}
+  def heartbeat_action(%{connected_at_mono: connected_at_mono}, false = _registered?) do
     now = System.monotonic_time(:millisecond)
     diff = now - connected_at_mono
 
     if diff > registration_timeout_msec() do
-      {{:disconnect, :registration_timeout}, state}
+      {:disconnect, :registration_timeout}
     else
-      {:noop, state}
+      :noop
     end
   end
 
@@ -43,18 +43,18 @@ defmodule IRCane.Client.SessionState do
     if diff > ping_timeout_msec() do
       {:send_ping, %{state | ping_sent_at_mono: now}}
     else
-      {:noop, state}
+      :noop
     end
   end
 
-  def heartbeat_action(%{ping_sent_at_mono: ping_sent_at_mono} = state, _registered?) do
+  def heartbeat_action(%{ping_sent_at_mono: ping_sent_at_mono}, _registered?) do
     now = System.monotonic_time(:millisecond)
     diff = now - ping_sent_at_mono
 
     if diff > ping_timeout_msec() do
-      {{:disconnect, :ping_timeout}, state}
+      {:disconnect, :ping_timeout}
     else
-      {:noop, state}
+      :noop
     end
   end
 

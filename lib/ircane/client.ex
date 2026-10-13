@@ -1,7 +1,6 @@
 defmodule IRCane.Client do
   @moduledoc false
   alias IRCane.Channel.Role
-  alias IRCane.Channels
   alias IRCane.Client.Command.Dispatcher
   alias IRCane.Client.Command.Runner
   alias IRCane.Client.ReverseDNSResolver
@@ -19,7 +18,8 @@ defmodule IRCane.Client do
   defstruct transport: nil,
             rdns_ref: nil,
             user: nil,
-            session: nil
+            session: nil,
+            stop: nil
 
   @type t :: any()
 
@@ -86,21 +86,18 @@ defmodule IRCane.Client do
 
   @impl GenServer
   def terminate(reason, state) do
-    message = state.user.quit_message || "User process terminated unexpectedly"
+    message =
+      case reason do
+        {:shutdown, {:quit, quit_message}} ->
+          Logger.debug("Client #{client_id(state)} disconnected normally")
+          quit_message
 
-    state.user.channels
-    |> Map.keys()
-    |> Enum.each(&Channels.broadcast_quit(&1, state.user, message))
+        _ ->
+          Logger.error("Client #{client_id(state)} terminated abnormally: #{inspect(reason)}")
+          "User process terminated unexpectedly"
+      end
 
     send_message(state, {:error, "Closing link: (#{host_mask(state)}) [#{message}]"})
-
-    case reason do
-      :normal ->
-        Logger.debug("Client #{client_id(state)} disconnected normally")
-
-      _ ->
-        Logger.error("Client #{client_id(state)} terminated abnormally: #{inspect(reason)}")
-    end
 
     if state.user.registered? do
       Stats.user_quit()
@@ -141,15 +138,15 @@ defmodule IRCane.Client do
     updated_session = SessionState.update_last_rx_mono(session)
     new_state = Enum.reduce(messages, %{state | session: updated_session}, &handle_line/2)
 
-    if new_state.user.quit_message do
-      {:stop, :normal, new_state}
+    if new_state.stop do
+      {:stop, {:shutdown, new_state.stop}, new_state}
     else
       {:noreply, new_state, heartbeat_interval_msec()}
     end
   end
 
   def handle_cast({:transport_error, reason}, state) do
-    {:stop, :normal, %{state | user: UserState.quit(state.user, "Transport error: #{reason}")}}
+    {:stop, {:shutdown, {:quit, "Transport error: #{reason}"}}, state}
   end
 
   @impl GenServer
@@ -276,8 +273,8 @@ defmodule IRCane.Client do
 
   defp maybe_timeout(%{user: user, session: session} = state) do
     case SessionState.heartbeat_action(session, user.registered?) do
-      {:noop, updated_session} ->
-        {:noreply, %{state | session: updated_session}, heartbeat_interval_msec()}
+      :noop ->
+        {:noreply, state, heartbeat_interval_msec()}
 
       {:send_ping, updated_session} ->
         Logger.info(
@@ -287,25 +284,20 @@ defmodule IRCane.Client do
         send_message(state, {:ping, "heartbeat"})
         {:noreply, %{state | session: updated_session}, heartbeat_interval_msec()}
 
-      {{:disconnect, reason}, updated_session} ->
+      {:disconnect, reason} ->
+        quit_message =
+          case reason do
+            :ping_timeout ->
+              diff = System.monotonic_time(:millisecond) - state.session.ping_sent_at_mono
+              "Ping timeout (#{diff / 1000} seconds)"
+
+            :registration_timeout ->
+              "Registration timeout"
+          end
+
         Logger.info("Disconnecting client #{client_id(state)} due to timeout: #{reason}")
-        updated_state = do_timeout(%{state | session: updated_session}, reason)
-        {:stop, :normal, updated_state}
+        {:stop, {:shutdown, {:quit, quit_message}}, state}
     end
-  end
-
-  defp do_timeout(state, reason) do
-    quit_message =
-      case reason do
-        :ping_timeout ->
-          diff = System.monotonic_time(:millisecond) - state.session.ping_sent_at_mono
-          "Ping timeout (#{diff / 1000} seconds)"
-
-        :registration_timeout ->
-          "Registration timeout"
-      end
-
-    %{state | user: UserState.quit(state.user, quit_message)}
   end
 
   defp send_message(state, message) do

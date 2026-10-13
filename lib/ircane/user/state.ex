@@ -10,7 +10,6 @@ defmodule IRCane.User.State do
             registered?: false,
             modes: %{},
             away_message: nil,
-            quit_message: nil,
             channels: %{},
             connected_at: nil,
             idle_since: nil
@@ -24,7 +23,6 @@ defmodule IRCane.User.State do
           registered?: boolean(),
           modes: %{optional(atom()) => any()},
           away_message: String.t() | nil,
-          quit_message: String.t() | nil,
           channels: %{optional(pid()) => ChannelMembership.t()}
         }
 
@@ -98,10 +96,6 @@ defmodule IRCane.User.State do
 
   def update_channel_roles(state, channel_pid, new_roles) do
     update_in(state.channels[channel_pid].roles, fn _ -> new_roles end)
-  end
-
-  def quit(state, message) do
-    %{state | quit_message: message}
   end
 
   def invisible?(state) do

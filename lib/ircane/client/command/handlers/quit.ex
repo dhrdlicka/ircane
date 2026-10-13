@@ -2,7 +2,6 @@ defmodule IRCane.Client.Command.Handlers.Quit do
   @moduledoc false
 
   alias IRCane.Client.Command.Plan
-  alias IRCane.User.State, as: UserState
 
   require Logger
 
@@ -13,9 +12,8 @@ defmodule IRCane.Client.Command.Handlers.Quit do
 
     plan =
       state
-      |> UserState.quit(quit_message)
       |> Plan.new()
-      |> Plan.with_reply({:quit, quit_message})
+      |> Plan.with_stop({:quit, quit_message})
 
     {:ok, plan}
   end

@@ -90,10 +90,6 @@ defmodule IRCane.Channels do
   def broadcast_nick(channel_pid, ref, client, new_nick),
     do: Channel.broadcast_nick(channel_pid, ref, client, new_nick)
 
-  @spec broadcast_quit(pid(), UserState.t(), String.t()) :: :ok
-  def broadcast_quit(channel_pid, client, reason),
-    do: Channel.broadcast_quit(channel_pid, client, reason)
-
   defp safe_call(channel_name, fun) do
     channel_name
     |> Channel.via()

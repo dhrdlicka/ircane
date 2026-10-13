@@ -8,12 +8,14 @@ defmodule IRCane.Client.Command.Plan do
   @enforce_keys [:state]
   defstruct state: nil,
             effects: [],
-            replies: []
+            replies: [],
+            stop: nil
 
   @type t :: %__MODULE__{
           state: UserState.t(),
           effects: [Effects.effect()],
-          replies: [Replies.reply()]
+          replies: [Replies.reply()],
+          stop: term() | nil
         }
 
   @spec new(UserState.t()) :: t()
@@ -37,5 +39,10 @@ defmodule IRCane.Client.Command.Plan do
   @spec with_replies(t(), [Replies.reply()]) :: t()
   def with_replies(result, replies) do
     %{result | replies: result.replies ++ replies}
+  end
+
+  @spec with_stop(t(), term()) :: t()
+  def with_stop(result, reason) do
+    %{result | stop: reason}
   end
 end
