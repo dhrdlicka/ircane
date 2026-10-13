@@ -28,7 +28,7 @@ defmodule IRCane.Channels do
   end
 
   defp join(channel_name, client, key, attempts) do
-    case safe_call(channel_name, &Channel.join(&1, client, key)) do
+    case safe_call(channel_name, &Channel.request(&1, client, {:join, key})) do
       {:error, {:no_such_channel, _channel}} ->
         case DynamicSupervisor.start_child(ChannelSupervisor, {Channel, name: channel_name}) do
           {:ok, _pid} ->
@@ -49,41 +49,42 @@ defmodule IRCane.Channels do
 
   @spec part(String.t(), UserState.t(), String.t()) :: {:ok, pid()} | {:error, term()}
   def part(channel_name, client, reason),
-    do: safe_call(channel_name, &Channel.part(&1, client, reason))
+    do: safe_call(channel_name, &Channel.request(&1, client, {:part, reason}))
 
   @spec names(String.t(), UserState.t()) ::
           {String.t(), pid() | nil, :public | :secret | :none, [Membership.t()]}
   def names(channel_name, client) do
-    with {:error, _} <- safe_call(channel_name, &Channel.names(&1, client)) do
+    with {:error, _} <- safe_call(channel_name, &Channel.request(&1, client, :names)) do
       {channel_name, nil, :none, []}
     end
   end
 
   @spec privmsg(String.t(), UserState.t(), String.t()) :: :ok | {:error, term()}
   def privmsg(channel_name, client, message),
-    do: safe_call(channel_name, &Channel.privmsg(&1, client, message))
+    do: safe_call(channel_name, &Channel.request(&1, client, {:privmsg, message}))
 
   @spec notice(String.t(), UserState.t(), String.t()) :: :ok
   def notice(channel_name, client, message) do
-    safe_call(channel_name, &Channel.notice(&1, client, message))
+    safe_call(channel_name, &Channel.request(&1, client, {:notice, message}))
     :ok
   end
 
   @spec topic(String.t(), UserState.t()) ::
           {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
-  def topic(channel_name, client), do: safe_call(channel_name, &Channel.topic(&1, client))
+  def topic(channel_name, client),
+    do: safe_call(channel_name, &Channel.request(&1, client, :topic))
 
   @spec update_topic(String.t(), UserState.t(), String.t()) :: :ok | {:error, term()}
   def update_topic(channel_name, client, new_topic),
-    do: safe_call(channel_name, &Channel.update_topic(&1, client, new_topic))
+    do: safe_call(channel_name, &Channel.request(&1, client, {:update_topic, new_topic}))
 
   @spec mode(String.t(), UserState.t()) :: {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
-  def mode(channel_name, client), do: safe_call(channel_name, &Channel.mode(&1, client))
+  def mode(channel_name, client), do: safe_call(channel_name, &Channel.request(&1, client, :mode))
 
   @spec update_mode(String.t(), UserState.t(), [Mode.mode_change()]) ::
           {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
   def update_mode(channel_name, client, mode_changes),
-    do: safe_call(channel_name, &Channel.update_mode(&1, client, mode_changes))
+    do: safe_call(channel_name, &Channel.request(&1, client, {:update_mode, mode_changes}))
 
   @spec broadcast_nick(pid(), reference(), UserState.t(), String.t()) :: :ok
   def broadcast_nick(channel_pid, ref, client, new_nick),

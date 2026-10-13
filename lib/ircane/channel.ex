@@ -1,12 +1,9 @@
 defmodule IRCane.Channel do
   @moduledoc false
-  alias IRCane.Channel.Membership
   alias IRCane.Channel.Modes
   alias IRCane.Channel.State, as: ChannelState
-  alias IRCane.Channel.Topic
   alias IRCane.ChannelRegistry
   alias IRCane.Client
-  alias IRCane.Protocol.Mode
   alias IRCane.Stats
   alias IRCane.User.State, as: UserState
 
@@ -21,6 +18,12 @@ defmodule IRCane.Channel do
     GenServer.start_link(__MODULE__, opts, name: via(channel_name))
   end
 
+  @spec request(GenServer.server(), UserState.t(), term()) ::
+          :ok | {:ok, term()} | {:error, term()}
+  def request(server, client, op) do
+    GenServer.call(server, {:request, client, op})
+  end
+
   @spec broadcast_nick(GenServer.server(), reference(), UserState.t(), String.t()) :: :ok
   def broadcast_nick(server, ref, from, new_nickname) do
     GenServer.cast(server, {:broadcast_nick, ref, from, new_nickname})
@@ -29,56 +32,6 @@ defmodule IRCane.Channel do
   @spec broadcast_quit(GenServer.server(), UserState.t(), String.t()) :: :ok
   def broadcast_quit(server, from, quit_message) do
     GenServer.cast(server, {:broadcast_quit, from, quit_message})
-  end
-
-  @spec join(GenServer.server(), UserState.t(), String.t() | nil) ::
-          {:ok, pid()} | :noop | {:error, term()}
-  def join(server, client, key) do
-    GenServer.call(server, {:join, client, key})
-  end
-
-  @spec part(GenServer.server(), UserState.t(), String.t()) :: {:ok, pid()} | {:error, term()}
-  def part(server, client, reason) do
-    GenServer.call(server, {:part, client, reason})
-  end
-
-  @spec names(GenServer.server(), UserState.t()) ::
-          {String.t(), pid(), :public | :secret | :none, [Membership.t()]}
-  def names(server, client) do
-    GenServer.call(server, {:names, client})
-  end
-
-  @spec privmsg(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
-  def privmsg(server, client, message) do
-    GenServer.call(server, {:privmsg, client, message})
-  end
-
-  @spec notice(GenServer.server(), UserState.t(), String.t()) :: :ok
-  def notice(server, client, message) do
-    GenServer.cast(server, {:notice, client, message})
-  end
-
-  @spec topic(GenServer.server(), UserState.t()) ::
-          {:ok, {String.t(), Topic.t() | nil}} | {:error, term()}
-  def topic(server, client) do
-    GenServer.call(server, {:topic, client})
-  end
-
-  @spec update_topic(GenServer.server(), UserState.t(), String.t()) :: :ok | {:error, term()}
-  def update_topic(server, client, new_topic) do
-    GenServer.call(server, {:update_topic, client, new_topic})
-  end
-
-  @spec mode(GenServer.server(), UserState.t()) ::
-          {:ok, {String.t(), [Mode.t()]}} | {:error, term()}
-  def mode(server, client) do
-    GenServer.call(server, {:mode, client})
-  end
-
-  @spec update_mode(GenServer.server(), UserState.t(), [Mode.mode_change()]) ::
-          {:ok, {String.t(), [Mode.mode_change()], [atom()]}} | {:error, term()}
-  def update_mode(server, client, updates) do
-    GenServer.call(server, {:update_mode, client, updates})
   end
 
   @spec via(String.t()) :: GenServer.name()
@@ -107,105 +60,8 @@ defmodule IRCane.Channel do
   end
 
   @impl true
-  def handle_call({:join, client, key}, _from, state) do
-    monitor_ref = Process.monitor(client.pid)
-
-    case ChannelState.join(state, client, monitor_ref, key) do
-      {:ok, new_state} ->
-        if state.new do
-          Logger.notice("User #{client.nickname} created channel #{state.name}")
-        else
-          Logger.notice("User #{client.nickname} joined channel #{state.name}")
-        end
-
-        update_registry_metadata(new_state)
-
-        {:reply, {:ok, self()}, new_state, {:continue, {:notify_join, client}}}
-
-      other ->
-        Process.demonitor(monitor_ref)
-        {:reply, other, state}
-    end
-  end
-
-  def handle_call({:names, client}, _from, state) do
-    {status, names} = ChannelState.names(state, client)
-    {:reply, {state.name, self(), status, names}, state}
-  end
-
-  def handle_call({:privmsg, client, message}, _from, state) do
-    case Modes.authorize(state, :speak, client) do
-      :ok ->
-        {:reply, :ok, state, {:continue, {:notify_privmsg, client, message}}}
-
-      error ->
-        {:reply, error, state}
-    end
-  end
-
-  def handle_call({:part, client, reason}, _from, state) do
-    case ChannelState.part(state, client) do
-      {:ok, {new_state, membership}} ->
-        Logger.info(
-          "User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}"
-        )
-
-        Process.demonitor(membership.monitor_ref)
-
-        update_registry_metadata(new_state)
-
-        {:reply, {:ok, self()}, new_state, {:continue, {:notify_part, client, reason}}}
-
-      other ->
-        {:reply, other, state}
-    end
-  end
-
-  def handle_call({:topic, client}, _from, state) do
-    case ChannelState.topic(state, client) do
-      {:ok, topic} ->
-        {:reply, {:ok, {state.name, topic}}, state}
-
-      other ->
-        {:reply, other, state}
-    end
-  end
-
-  def handle_call({:mode, client}, _from, state) do
-    case ChannelState.mode(state, client) do
-      {:ok, modes} ->
-        {:reply, {:ok, {state.name, modes}}, state}
-
-      other ->
-        {:reply, other, state}
-    end
-  end
-
-  def handle_call({:update_mode, client, updates}, _from, state) do
-    case ChannelState.update_mode(state, client, updates) do
-      {:ok, {new_state, applied_updates, errors}} ->
-        update_registry_metadata(new_state)
-
-        role_changes = ChannelState.role_changes(new_state, state)
-
-        {:reply, {:ok, {state.name, applied_updates, errors}}, new_state,
-         {:continue, {:notify_mode, client, applied_updates, role_changes}}}
-
-      other ->
-        {:reply, other, state}
-    end
-  end
-
-  def handle_call({:update_topic, client, new_topic}, _from, state) do
-    case ChannelState.update_topic(state, client, new_topic) do
-      {:ok, new_state} ->
-        Logger.info("User #{client.nickname} set topic in #{state.name}: #{inspect(new_topic)}")
-        update_registry_metadata(new_state)
-        {:reply, :ok, new_state, {:continue, {:notify_topic, client, new_topic}}}
-
-      other ->
-        {:reply, other, state}
-    end
+  def handle_call({:request, %{pid: pid} = client, op}, {pid, _tag}, state) do
+    handle_request(state, client, op)
   end
 
   @impl true
@@ -291,6 +147,107 @@ defmodule IRCane.Channel do
       terminate_if_empty(new_state)
     else
       {:noreply, state}
+    end
+  end
+
+  defp handle_request(state, client, {:join, key}) do
+    monitor_ref = Process.monitor(client.pid)
+
+    case ChannelState.join(state, client, monitor_ref, key) do
+      {:ok, new_state} ->
+        if state.new do
+          Logger.notice("User #{client.nickname} created channel #{state.name}")
+        else
+          Logger.notice("User #{client.nickname} joined channel #{state.name}")
+        end
+
+        update_registry_metadata(new_state)
+
+        {:reply, {:ok, self()}, new_state, {:continue, {:notify_join, client}}}
+
+      other ->
+        Process.demonitor(monitor_ref)
+        {:reply, other, state}
+    end
+  end
+
+  defp handle_request(state, client, :names) do
+    {status, names} = ChannelState.names(state, client)
+    {:reply, {state.name, self(), status, names}, state}
+  end
+
+  defp handle_request(state, client, {:privmsg, message}) do
+    case Modes.authorize(state, :speak, client) do
+      :ok ->
+        {:reply, :ok, state, {:continue, {:notify_privmsg, client, message}}}
+
+      error ->
+        {:reply, error, state}
+    end
+  end
+
+  defp handle_request(state, client, {:part, reason}) do
+    case ChannelState.part(state, client) do
+      {:ok, {new_state, membership}} ->
+        Logger.info(
+          "User #{client.nickname} parted channel #{state.name}#{if reason != "", do: " (#{reason})", else: ""}"
+        )
+
+        Process.demonitor(membership.monitor_ref, [:flush])
+
+        update_registry_metadata(new_state)
+
+        {:reply, {:ok, self()}, new_state, {:continue, {:notify_part, client, reason}}}
+
+      other ->
+        {:reply, other, state}
+    end
+  end
+
+  defp handle_request(state, client, :topic) do
+    case ChannelState.topic(state, client) do
+      {:ok, topic} ->
+        {:reply, {:ok, {state.name, topic}}, state}
+
+      other ->
+        {:reply, other, state}
+    end
+  end
+
+  defp handle_request(state, client, :mode) do
+    case ChannelState.mode(state, client) do
+      {:ok, modes} ->
+        {:reply, {:ok, {state.name, modes}}, state}
+
+      other ->
+        {:reply, other, state}
+    end
+  end
+
+  defp handle_request(state, client, {:update_mode, updates}) do
+    case ChannelState.update_mode(state, client, updates) do
+      {:ok, {new_state, applied_updates, errors}} ->
+        update_registry_metadata(new_state)
+
+        role_changes = ChannelState.role_changes(new_state, state)
+
+        {:reply, {:ok, {state.name, applied_updates, errors}}, new_state,
+         {:continue, {:notify_mode, client, applied_updates, role_changes}}}
+
+      other ->
+        {:reply, other, state}
+    end
+  end
+
+  defp handle_request(state, client, {:update_topic, new_topic}) do
+    case ChannelState.update_topic(state, client, new_topic) do
+      {:ok, new_state} ->
+        Logger.info("User #{client.nickname} set topic in #{state.name}: #{inspect(new_topic)}")
+        update_registry_metadata(new_state)
+        {:reply, :ok, new_state, {:continue, {:notify_topic, client, new_topic}}}
+
+      other ->
+        {:reply, other, state}
     end
   end
 
